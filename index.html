@@ -8,7 +8,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>🌿 UTN Mesh Dashboard para DON POLI</h1>
+    <h1>🌿 UTN Mesh Dashboard</h1>
 
     <section>
       <h2>Insertar dato</h2>
@@ -33,6 +33,14 @@
       </table>
     </section>
   </div>
+
+  <!-- ✅ Protección de acceso: redirigir si no está autenticado -->
+  <script>
+    if (window.location.pathname !== "/login.html" &&
+        localStorage.getItem("autenticado") !== "true") {
+      window.location.href = "login.html";
+    }
+  </script>
 
   <script src="js/api.js"></script>
 </body>
