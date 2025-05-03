@@ -1,5 +1,10 @@
 const API_URL = "https://api.utnmesh.online"; // Cambiar por tu dominio real
 
+if (window.location.pathname !== "/login.html" &&
+  localStorage.getItem("autenticado") !== "true") {
+window.location.href = "login.html";
+}
+
 function insertarDato() {
   const nombre = document.getElementById("nombre").value;
   const valor = parseFloat(document.getElementById("valor").value);
