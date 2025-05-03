@@ -3,42 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <title>Login UTN Mesh</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/estilo.css" />
 </head>
 <body>
   <div class="container">
     <h1>Login 🔐</h1>
+
     <input type="text" id="usuario" placeholder="Usuario" />
     <input type="password" id="contrasena" placeholder="Contraseña" />
     <button onclick="iniciarSesion()">Iniciar sesión</button>
+
     <p id="mensaje-error" style="color: red;"></p>
   </div>
 
-  <script>
-    const API_URL = "https://api.utnmesh.online";
-
-    function iniciarSesion() {
-      const usuario = document.getElementById("usuario").value;
-      const contrasena = document.getElementById("contrasena").value;
-
-      fetch(`${API_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usuario, contrasena })
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            localStorage.setItem("autenticado", "true");
-            window.location.href = "index.html";
-          } else {
-            document.getElementById("mensaje-error").innerText = "Credenciales inválidas";
-          }
-        })
-        .catch(() => {
-          document.getElementById("mensaje-error").innerText = "Error al conectar con la API";
-        });
-    }
-  </script>
+  <script src="js/login.js"></script>
 </body>
 </html>
