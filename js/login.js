@@ -1,5 +1,12 @@
 const API_URL = "https://ht5itniv36.execute-api.sa-east-1.amazonaws.com/meshlora";
 
+if (window.location.pathname !== "/login.html" &&
+  localStorage.getItem("autenticado") !== "true") {
+window.location.href = "login.html";
+}
+
+
+
 function iniciarSesion() {
   const usuario = document.getElementById("usuario").value;
   const contrasena = document.getElementById("contrasena").value;
