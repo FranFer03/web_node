@@ -4,15 +4,16 @@ function iniciarSesion() {
   const usuario = document.getElementById("usuario").value;
   const contrasena = document.getElementById("contrasena").value;
 
-  // Codificar los parámetros en la URL
-  const url = `${API_URL}/user?usuario=${encodeURIComponent(usuario)}&contrasena=${encodeURIComponent(contrasena)}`;
-
-  fetch(url)
+  fetch(`${API_URL}/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usuario, contrasena })
+  })
     .then(res => res.json())
     .then(data => {
       if (data.success) {
         localStorage.setItem("autenticado", "true");
-        localStorage.setItem("token", data.token);
+        localStorage.setItem("token", data.token);  // (opcional: guardar el token)
         window.location.href = "index.html";
       } else {
         document.getElementById("mensaje-error").innerText = "Credenciales inválidas";
