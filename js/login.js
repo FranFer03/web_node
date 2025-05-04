@@ -5,7 +5,7 @@ function iniciarSesion() {
   const contrasena = document.getElementById("contrasena").value;
 
   fetch(`${API_URL}/login`, {
-    method: "POST",
+    method: "GET",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ usuario, contrasena })
   })
