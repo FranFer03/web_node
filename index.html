@@ -1,46 +1,38 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Panel UTN Mesh</title>
-  <link rel="stylesheet" href="css/estilo.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administración de Nodos</title>
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>🌿 UTN Mesh Dashboard</h1>
+  <h1>Administración de Nodos LoRa</h1>
 
-    <section>
-      <h2>Insertar dato</h2>
-      <input type="text" id="nombre" placeholder="Nombre del sensor" />
-      <input type="number" id="valor" placeholder="Valor" />
-      <button onclick="insertarDato()">Enviar</button>
-    </section>
-
-    <section>
-      <h2>Datos actuales</h2>
-      <button onclick="cargarDatos()">Actualizar</button>
-      <table id="tabla-datos">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Nombre</th>
-            <th>Valor</th>
-            <th>Eliminar</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
+  <div id="nodeForm">
+    <h2>Agregar Nuevo Nodo</h2>
+    <label for="model">Modelo:</label>
+    <input type="text" id="model" name="model" required><br><br>
+    <label for="refresh_rate">Refresh Rate:</label>
+    <input type="number" id="refresh_rate" name="refresh_rate" value="5" required><br><br>
+    <button id="agregarBtn">Agregar Nodo</button>
   </div>
 
-  <!-- ✅ Protección de acceso: redirigir si no está autenticado -->
-  <script>
-    if (window.location.pathname !== "/login.html" &&
-        localStorage.getItem("autenticado") !== "true") {
-      window.location.href = "login.html";
-    }
-  </script>
+  <h2>Lista de Nodos</h2>
+  <table id="nodeTable">
+    <thead>
+        <tr>
+          <th>ID</th>
+          <th>Modelo</th>
+          <th>Refresh Rate</th>
+          <th>Estado</th>
+          <th>Activado En</th>
+          <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody id="nodeList">
+        </tbody>
+  </table>
 
   <script src="js/api.js"></script>
 </body>
