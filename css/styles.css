@@ -85,3 +85,8 @@ tr:hover {
 #nodeList button:hover {
   background-color: #c82333;
 }
+
+.btn-danger { background-color: red; color: white; }
+.btn-warning { background-color: orange; color: black; }
+.btn-success { background-color: green; color: white; }
+/* Añade más estilos como padding, border, etc. */
