@@ -224,3 +224,96 @@ document.addEventListener('DOMContentLoaded', () => {
         listarNodos();
     }
 });
+
+// Función para mostrar los nodos en la tabla (en api.js)
+function mostrarNodos(nodos) {
+    const nodeList = document.getElementById('nodeList');
+    nodeList.innerHTML = ''; // Limpiar la tabla antes de agregar los nodos
+
+    if (!nodos || nodos.length === 0) {
+        const row = nodeList.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 6; // Ajustar al número de columnas
+        cell.textContent = 'No hay nodos para mostrar.';
+        cell.style.textAlign = 'center';
+        return;
+    }
+
+    nodos.forEach(nodo => {
+        const row = nodeList.insertRow();
+        // Animación sutil al añadir la fila (puedes mejorarla o quitarla)
+        // row.style.opacity = 0;
+        // setTimeout(() => row.style.opacity = 1, 50);
+
+
+        const idCell = row.insertCell();
+        const modelCell = row.insertCell();
+        const refreshRateCell = row.insertCell();
+        const statusCell = row.insertCell();
+        const activatedAtCell = row.insertCell();
+        const actionsCell = row.insertCell();
+        actionsCell.classList.add('text-nowrap'); // Evitar que los botones se partan en dos líneas
+
+        idCell.textContent = nodo.node_id;
+        modelCell.textContent = nodo.model;
+        refreshRateCell.textContent = nodo.refresh_rate;
+
+        // Celda de Estado con Badges
+        const statusBadge = document.createElement('span');
+        statusBadge.classList.add('badge');
+        if (nodo.status === 1) {
+            statusBadge.classList.add('bg-success');
+            statusBadge.textContent = 'Activo';
+        } else {
+            statusBadge.classList.add('bg-danger'); // Puedes usar bg-secondary o bg-warning si prefieres
+            statusBadge.textContent = 'Inactivo';
+        }
+        statusCell.appendChild(statusBadge);
+
+        // Celda Activado En con Tooltip
+        const activatedDate = nodo.activated_at ? new Date(nodo.activated_at) : null;
+        activatedAtCell.textContent = activatedDate ? activatedDate.toLocaleString() : 'N/A';
+        if (activatedDate) {
+            activatedAtCell.setAttribute('data-bs-toggle', 'tooltip');
+            activatedAtCell.setAttribute('data-bs-placement', 'top');
+            activatedAtCell.setAttribute('title', `Fecha exacta: ${activatedDate.toISOString()}`);
+        }
+
+
+        // Botón para Eliminar Nodo con Icono y Tooltip
+        const eliminarButton = document.createElement('button');
+        eliminarButton.classList.add('btn', 'btn-danger', 'btn-sm');
+        eliminarButton.innerHTML = '<i class="bi bi-trash3-fill"></i> Eliminar';
+        eliminarButton.onclick = () => eliminarNodo(nodo.node_id);
+        eliminarButton.setAttribute('data-bs-toggle', 'tooltip');
+        eliminarButton.setAttribute('data-bs-placement', 'top');
+        eliminarButton.setAttribute('title', 'Eliminar este nodo');
+        actionsCell.appendChild(eliminarButton);
+
+        actionsCell.appendChild(document.createTextNode(' ')); // Espacio
+
+        // Botón para Cambiar Estado del Nodo con Icono y Tooltip
+        const cambiarEstadoButton = document.createElement('button');
+        cambiarEstadoButton.classList.add('btn', 'btn-sm');
+        if (nodo.status === 1) {
+            cambiarEstadoButton.classList.add('btn-warning');
+            cambiarEstadoButton.innerHTML = '<i class="bi bi-toggle-off"></i> Desactivar';
+            cambiarEstadoButton.setAttribute('title', 'Desactivar este nodo');
+        } else {
+            cambiarEstadoButton.classList.add('btn-success');
+            cambiarEstadoButton.innerHTML = '<i class="bi bi-toggle-on"></i> Activar';
+            cambiarEstadoButton.setAttribute('title', 'Activar este nodo');
+        }
+        cambiarEstadoButton.onclick = () => cambiarEstadoNodo(nodo.node_id, nodo.status);
+        cambiarEstadoButton.setAttribute('data-bs-toggle', 'tooltip');
+        cambiarEstadoButton.setAttribute('data-bs-placement', 'top');
+        actionsCell.appendChild(cambiarEstadoButton);
+    });
+
+    // Reinicializar los tooltips de Bootstrap después de modificar el DOM
+    // Esto se puede mover a una función en main.js si es necesario en más sitios
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+}
