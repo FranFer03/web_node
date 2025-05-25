@@ -314,6 +314,9 @@ function mostrarNodos(nodos) {
     // Esto se puede mover a una función en main.js si es necesario en más sitios
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl)
-    })
+        // AÑADE LA OPCIÓN container: 'body' AQUÍ:
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            container: 'body'
+        });
+    });
 }
