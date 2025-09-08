@@ -35,6 +35,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         }
+        
+        // Cargar dashboard en tiempo real
+        if (sectionId === 'dashboard-rt') {
+            if (typeof cargarDashboardRT === 'function') {
+                cargarDashboardRT();
+            }
+        }
         // Para otras secciones, podrías tener funciones de inicialización similares
     }
 

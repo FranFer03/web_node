@@ -1,92 +1,257 @@
+
 body {
-  font-family: sans-serif;
-  margin: 20px;
-  background-color: #f4f4f4;
-  color: #333;
+  font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+  margin: 0;
+  background: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 100%);
+  color: #222;
+  min-height: 100vh;
 }
+
 
 h1, h2 {
-  color: #007bff;
+  color: #2563eb;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
-#nodeForm {
+
+#nodeForm, #nodeFormContainer {
   background-color: #fff;
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  padding: 24px 28px;
+  margin-bottom: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
 }
+
 
 label {
   display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #374151;
 }
+
 
 input[type="text"],
 input[type="number"] {
-  width: calc(100% - 12px);
-  padding: 8px;
-  margin-bottom: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
   box-sizing: border-box;
+  font-size: 1rem;
+  background: #f1f5f9;
+  transition: border-color 0.2s;
+}
+input[type="text"]:focus,
+input[type="number"]:focus {
+  border-color: #2563eb;
+  outline: none;
+  background: #fff;
 }
 
-button {
-  background-color: #007bff;
-  color: white;
-  padding: 10px 15px;
+
+button, .btn {
+  background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
+  color: #fff;
+  padding: 10px 18px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 16px;
-  transition: background-color 0.3s ease;
+  font-size: 1rem;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+button:hover, .btn:hover {
+  background: linear-gradient(90deg, #1d4ed8 60%, #2563eb 100%);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.12);
 }
 
-button:hover {
-  background-color: #0056b3;
-}
 
 table {
   width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 24px;
   background-color: #fff;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  border-radius: 5px;
-  overflow: hidden; /* Para que el border-radius funcione en la tabla */
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
+
 th, td {
-  border: 1px solid #ddd;
-  padding: 10px;
+  border: 1px solid #e5e7eb;
+  padding: 12px 14px;
   text-align: left;
 }
 
 th {
-  background-color: #f2f2f2;
-  font-weight: bold;
+  background: linear-gradient(90deg, #2563eb 10%, #60a5fa 100%);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
+
 
 tr:nth-child(even) {
-  background-color: #f9f9f9;
+  background-color: #f1f5f9;
 }
-
 tr:hover {
-  background-color: #e0e0e0;
+  background-color: #e0e7ff;
 }
 
-#nodeList button {
-  background-color: #dc3545;
+
+#nodeList button.btn-danger {
+  background: linear-gradient(90deg, #dc3545 60%, #f87171 100%);
+}
+#nodeList button.btn-danger:hover {
+  background: linear-gradient(90deg, #b91c1c 60%, #dc2626 100%);
 }
 
-#nodeList button:hover {
-  background-color: #c82333;
+
+.btn-danger {
+  background: linear-gradient(90deg, #dc3545 60%, #f87171 100%) !important;
+  color: #fff !important;
+}
+.btn-danger:hover {
+  background: linear-gradient(90deg, #b91c1c 60%, #dc2626 100%) !important;
+}
+.btn-warning {
+  background: linear-gradient(90deg, #f59e42 60%, #fbbf24 100%) !important;
+  color: #222 !important;
+}
+.btn-warning:hover {
+  background: linear-gradient(90deg, #d97706 60%, #f59e42 100%) !important;
+}
+.btn-success {
+  background: linear-gradient(90deg, #22c55e 60%, #4ade80 100%) !important;
+  color: #fff !important;
+}
+.btn-success:hover {
+  background: linear-gradient(90deg, #15803d 60%, #22c55e 100%) !important;
 }
 
-.btn-danger { background-color: red; color: white; }
-.btn-warning { background-color: orange; color: black; }
-.btn-success { background-color: green; color: white; }
-/* Añade más estilos como padding, border, etc. */
+/* Badges más modernos */
+.badge {
+  font-size: 0.95em;
+  padding: 0.5em 0.9em;
+  border-radius: 1em;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.08);
+  letter-spacing: 0.2px;
+}
+
+/* Navbar mejorada */
+.navbar {
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.10);
+  background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%) !important;
+}
+.navbar .navbar-brand, .navbar .nav-link {
+  color: #fff !important;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+.navbar .nav-link.active, .navbar .nav-link.fw-bold {
+  color: #fbbf24 !important;
+  font-weight: 700 !important;
+}
+
+/* Botón de cerrar sesión */
+.btn-outline-light {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  color: #fff !important;
+  font-weight: 500;
+}
+.btn-outline-light:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: #fff !important;
+  color: #fff !important;
+}
+
+/* Footer elegante */
+footer {
+  background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
+  color: #fff;
+  text-align: center;
+  padding: 18px 0 12px 0;
+  font-size: 1.05em;
+  letter-spacing: 0.5px;
+  margin-top: 48px;
+  box-shadow: 0 -2px 12px rgba(37, 99, 235, 0.10);
+}
+
+/* Estilos para Dashboard en Tiempo Real */
+.node-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
+  border: 1px solid #e5e7eb;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.node-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.12);
+}
+
+.node-card-header {
+  background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
+  color: #fff;
+  padding: 16px 20px;
+  border-radius: 12px 12px 0 0;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.node-card-body {
+  padding: 20px;
+}
+
+.sensor-reading {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border-left: 4px solid #2563eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sensor-reading:last-child {
+  margin-bottom: 0;
+}
+
+.sensor-label {
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sensor-value {
+  font-weight: 700;
+  color: #2563eb;
+  font-size: 1.1em;
+}
+
+.node-status-badge {
+  font-size: 0.85em;
+  padding: 0.4em 0.8em;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.timestamp-info {
+  font-size: 0.85em;
+  color: #6b7280;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

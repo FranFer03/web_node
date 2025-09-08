@@ -1,4 +1,4 @@
-const API_URL = "https://ht5itniv36.execute-api.sa-east-1.amazonaws.com/meshlora";
+const API_URL = "http://159.112.185.90";
 
 if (window.location.pathname !== "/login.html" &&
   localStorage.getItem("autenticado") !== "true") {
@@ -11,7 +11,7 @@ function iniciarSesion() {
   const usuario = document.getElementById("usuario").value;
   const contrasena = document.getElementById("contrasena").value;
 
-  fetch(`${API_URL}/users`, {
+  fetch(`${API_URL}/users/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ usuario, contrasena })

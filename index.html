@@ -31,7 +31,10 @@
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#" data-section="home">Proyecto LoRa</a>
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#" data-section="home">
+                <img src="https://frt.utn.edu.ar/wp-content/uploads/elementor/thumbs/descarga-removebg-preview-qxah6c0ycvhe6sie8wx30a0gb3rf1yn226favl26tc-qy17u6no60q8xbkeh0dtetqyiz7hei7hiu2sc1k9vk.png" alt="UTN Logo" style="height:36px; width:auto; box-shadow:0 1px 4px rgba(0,0,0,0.07);">
+                <span>Proyecto LoRa</span>
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -50,11 +53,16 @@
                         <a class="nav-link" href="#" data-section="admin-nodos">Administración de Nodos</a>
                     </li>
                 </ul>
+                <div class="d-flex">
+                    <button class="btn btn-outline-light btn-sm" onclick="cerrarSesion()">
+                        <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                    </button>
+                </div>
                 </div>
         </div>
     </nav>
 
-    <div class="container mt-4" id="mainContentArea">
+    <div class="container-fluid mt-4" id="mainContentArea">
         </div>
 
     <div id="section-templates" style="display: none;">
@@ -64,26 +72,41 @@
             <p>Este sistema permite la monitorización y gestión de nodos LoRa que reportan datos ambientales como temperatura, humedad y velocidad del viento.</p>
         </div>
 
-        <div id="dashboard-hist-content">
-            <h2>Dashboard Histórico (Futura Integración con Grafana)</h2>
-            <p>En esta sección, en el futuro, se integrará un dashboard de Grafana para visualizar los datos históricos recolectados por cada nodo. Esto permitirá analizar tendencias, patrones y el comportamiento de los sensores a lo largo del tiempo.</p>
-            <div class="alert alert-info" role="alert">
-                <strong>Próximamente:</strong> Integración con Grafana.
-            </div>
-        </div>
+                <div id="dashboard-hist-content">
+                    <h2>Dashboard Histórico</h2>
+                    <p>A continuación se muestra el dashboard de Power BI con los datos históricos recolectados por los nodos.</p>
+                        <div style="position:relative; width:100%; padding-top:62.25%;">
+                            <iframe title="Dashboard_web_proyectoFinal"
+                                src="https://app.powerbi.com/view?r=eyJrIjoiMzYwMjJhMDItYjY5OS00YTM1LWE1MDgtZTE0YTcwOGU3NmQxIiwidCI6ImEzNGUyZWVmLTE0ZjUtNDAwMC04ZTQwLTc5MTc0M2I2MzcxMSIsImMiOjR9"
+                                style="position:absolute; top:0; left:0; width:100%; height:100%; border:0;"
+                                frameborder="0" allowfullscreen="true">
+                            </iframe>
+                        </div>
+                </div>
 
         <div id="dashboard-rt-content">
-            <h2>Dashboard en Tiempo Real (Ejemplo Visual)</h2>
-            <p>Este dashboard mostrará los datos más recientes reportados por los nodos en tiempo real. Por ahora, se presenta un modelo visual de ejemplo. La conexión con la API para datos en vivo se implementará en una fase posterior.</p>
-            <div class="card">
-                <div class="card-header">
-                    Estado Actual de Nodos (Ejemplo)
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Dashboard en Tiempo Real</h2>
+                <button class="btn btn-primary btn-sm" onclick="actualizarDashboardRT()">
+                    <i class="bi bi-arrow-clockwise"></i> Actualizar
+                </button>
+            </div>
+            <p>Datos más recientes reportados por los nodos LoRa en tiempo real.</p>
+            
+            <div id="dashboardLoading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
                 </div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item">Nodo Alfa: Temperatura: 24°C, Humedad: 58%, Viento: 5 km/h <span class="badge bg-success float-end">Activo</span></li>
-                    <li class="list-group-item">Nodo Beta: Temperatura: 22°C, Humedad: 62%, Viento: 3 km/h <span class="badge bg-success float-end">Activo</span></li>
-                    <li class="list-group-item">Nodo Gamma: Última lectura hace 1 hora <span class="badge bg-warning text-dark float-end">Inactivo</span></li>
-                </ul>
+                <p class="mt-2">Cargando datos de los nodos...</p>
+            </div>
+            
+            <div id="dashboardError" class="alert alert-danger" role="alert" style="display: none;">
+                <i class="bi bi-exclamation-triangle"></i> 
+                <strong>Error:</strong> <span id="errorMessage"></span>
+            </div>
+            
+            <div id="nodesContainer" class="row g-4">
+                <!-- Las tarjetas de nodos se generarán dinámicamente aquí -->
             </div>
         </div>
 
@@ -130,8 +153,12 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-    <script src="js/api.js"></script>
-    <script src="js/main.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+        <script src="js/api.js"></script>
+        <script src="js/main.js"></script>
+
+        <footer>
+            Proyecto LoRa &copy; 2025 &mdash; Desarrollado por UTN Mesh
+        </footer>
 </body>
 </html>

@@ -1,322 +1,461 @@
-const apiUrl = 'https://ht5itniv36.execute-api.sa-east-1.amazonaws.com';
+const apiUrl = 'http://159.112.185.90';
 
-// Redirección a la página de login si no está autenticado
-// Esta verificación se ejecuta en todas las páginas excepto en login.html
-if (window.location.pathname !== "/login.html" &&
-    localStorage.getItem("autenticado") !== "true") {
-    window.location.href = "login.html";
+/* ---------- Guard de autenticación ---------- */
+(function guardAuth() {
+  const onLogin = window.location.pathname.endsWith('/login.html') || window.location.pathname.endsWith('login.html');
+  const autenticado = localStorage.getItem('autenticado') === 'true';
+  if (!onLogin && !autenticado) {
+    // Evita que el usuario “vuelva” a la página protegida
+    window.location.replace('login.html');
+  }
+})();
+
+/* ---------- Helper fetch con manejo uniforme de errores ---------- */
+async function apiFetch(path, options = {}) {
+  const opts = {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      // Si en el futuro agregás auth: 'Authorization': `Bearer ${token}`
+    },
+    ...options,
+  };
+
+  const res = await fetch(`${apiUrl}${path}`, opts);
+
+  // Intentar parsear json siempre que sea posible
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    // Si no hay body o no es JSON, dejamos data en undefined
+  }
+
+  if (!res.ok) {
+    const msg = (data && (data.message || data.error)) 
+      ? `${data.message || data.error}`
+      : `HTTP ${res.status} - ${res.statusText}`;
+    throw new Error(msg);
+  }
+
+  return data;
 }
 
-// Función para agregar un nuevo nodo
+/* ---------- Acciones ---------- */
 async function agregarNodo() {
-    const modelInput = document.getElementById('model');
-    const refreshRateInput = document.getElementById('refresh_rate');
+  const modelInput = document.getElementById('model');
+  const refreshRateInput = document.getElementById('refresh_rate');
 
-    const model = modelInput.value.trim(); // Eliminar espacios en blanco al inicio/final
-    const refresh_rate = parseInt(refreshRateInput.value);
+  const model = modelInput.value.trim();
+  const refresh_rate = Number(refreshRateInput.value);
 
-    if (!model) {
-        alert('Por favor, ingrese el modelo del nodo.');
-        modelInput.focus(); // Poner el foco en el campo modelo
-        return;
-    }
+  if (!model) {
+    alert('Por favor, ingrese el modelo del nodo.');
+    modelInput.focus();
+    return;
+  }
+  if (!Number.isInteger(refresh_rate) || refresh_rate < 0) {
+    alert('Por favor, ingrese un valor válido para Refresh Rate (entero no negativo).');
+    refreshRateInput.focus();
+    return;
+  }
 
-    if (isNaN(refresh_rate) || refresh_rate < 0) {
-        alert('Por favor, ingrese un valor válido para Refresh Rate (número entero no negativo).');
-        refreshRateInput.focus();
-        return;
-    }
+  const btn = document.getElementById('agregarBtn');
+  btn?.setAttribute('disabled', 'disabled');
 
-    const nuevoNodo = {
-        "model": model,
-        "refresh_rate": refresh_rate
-    };
-
-    try {
-        const response = await fetch(`${apiUrl}/meshlora/node`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(nuevoNodo)
-        });
-
-        if (response.ok) {
-            console.log('Nodo agregado correctamente');
-            listarNodos(); // Actualizar la lista después de agregar
-            modelInput.value = ''; // Limpiar campo modelo
-            refreshRateInput.value = '5'; // Resetear refresh rate al valor por defecto
-        } else {
-            let errorMessage = 'Error al agregar el nodo.';
-            try {
-                const errorData = await response.json();
-                if (errorData && errorData.message) {
-                    errorMessage += ` ${errorData.message}`;
-                } else {
-                    errorMessage += ` Código: ${response.status} - ${response.statusText}`;
-                }
-            } catch (e) {
-                // Si no se puede parsear el JSON del error, usar el statusText
-                errorMessage += ` Código: ${response.status} - ${response.statusText}`;
-            }
-            console.error(errorMessage);
-            alert(errorMessage);
-        }
-    } catch (error) {
-        console.error('Error de red al agregar el nodo:', error);
-        alert('Error de red al agregar el nodo. Verifique su conexión e intente nuevamente.');
-    }
-}
-
-// Función para listar los nodos
-async function listarNodos() {
-    try {
-        const response = await fetch(`${apiUrl}/meshlora/node`);
-        if (response.ok) {
-            const nodos = await response.json();
-            mostrarNodos(nodos);
-        } else {
-            console.error('Error al obtener la lista de nodos:', response.status, response.statusText);
-            alert(`Error al obtener la lista de nodos. Código: ${response.status} - ${response.statusText}`);
-        }
-    } catch (error) {
-        console.error('Error de red al obtener la lista de nodos:', error);
-        alert('Error de red al obtener la lista de nodos. Verifique su conexión e intente nuevamente.');
-    }
-}
-
-// Función para mostrar los nodos en la tabla
-function mostrarNodos(nodos) {
-    const nodeList = document.getElementById('nodeList');
-    nodeList.innerHTML = ''; // Limpiar la tabla antes de agregar los nodos
-
-    if (!nodos || nodos.length === 0) {
-        const row = nodeList.insertRow();
-        const cell = row.insertCell();
-        cell.colSpan = 6; // Asegúrate que coincida con el número de columnas en tu <thead>
-        cell.textContent = 'No hay nodos para mostrar.';
-        cell.style.textAlign = 'center';
-        return;
-    }
-
-    nodos.forEach(nodo => {
-        const row = nodeList.insertRow();
-        const idCell = row.insertCell();
-        const modelCell = row.insertCell();
-        const refreshRateCell = row.insertCell();
-        const statusCell = row.insertCell();
-        const activatedAtCell = row.insertCell();
-        const actionsCell = row.insertCell();
-
-        idCell.textContent = nodo.node_id;
-        modelCell.textContent = nodo.model;
-        refreshRateCell.textContent = nodo.refresh_rate;
-        statusCell.textContent = nodo.status === 1 ? 'Activo' : 'Inactivo';
-        // Formatear la fecha para mejor legibilidad, y manejar si es null o undefined
-        activatedAtCell.textContent = nodo.activated_at ? new Date(nodo.activated_at).toLocaleString() : 'N/A';
-
-        // Botón para Eliminar Nodo
-        const eliminarButton = document.createElement('button');
-        eliminarButton.textContent = 'Eliminar';
-        eliminarButton.classList.add('btn-danger'); // Clase opcional para estilizar
-        eliminarButton.onclick = () => eliminarNodo(nodo.node_id);
-        actionsCell.appendChild(eliminarButton);
-
-        // Espacio entre botones (puedes usar CSS margin para esto también)
-        actionsCell.appendChild(document.createTextNode(' '));
-
-        // Botón para Cambiar Estado del Nodo
-        const cambiarEstadoButton = document.createElement('button');
-        cambiarEstadoButton.textContent = nodo.status === 1 ? 'Desactivar' : 'Activar';
-        // Aplicar una clase diferente según la acción para mejor UX (opcional)
-        cambiarEstadoButton.classList.add(nodo.status === 1 ? 'btn-warning' : 'btn-success');
-        cambiarEstadoButton.onclick = () => cambiarEstadoNodo(nodo.node_id, nodo.status);
-        actionsCell.appendChild(cambiarEstadoButton);
+  try {
+    await apiFetch('/device-nodes', {
+      method: 'POST',
+      body: JSON.stringify({ model, refresh_rate }),
     });
+    // Reset UI
+    modelInput.value = '';
+    refreshRateInput.value = '5';
+    await listarNodos();
+  } catch (err) {
+    console.error('Error al agregar nodo:', err);
+    alert(`Error al agregar el nodo. ${String(err.message || err)}`);
+  } finally {
+    btn?.removeAttribute('disabled');
+  }
+}
+async function listarNodos() {
+  const tbody = document.getElementById('nodeList');
+  if (!tbody) return;
+
+  // Estado de carga simple
+  tbody.innerHTML = '';
+  const row = tbody.insertRow();
+  const cell = row.insertCell();
+  cell.colSpan = 6;
+  cell.textContent = 'Cargando...';
+  cell.style.textAlign = 'center';
+
+  try {
+    const nodos = await apiFetch('/device-nodes');
+    mostrarNodos(nodos);
+  } catch (err) {
+    console.error('Error al listar nodos:', err);
+    tbody.innerHTML = '';
+    const r = tbody.insertRow();
+    const c = r.insertCell();
+    c.colSpan = 6;
+    c.textContent = `Error al obtener la lista de nodos: ${String(err.message || err)}`;
+    c.style.textAlign = 'center';
+  }
 }
 
-// Función para cambiar el estado de un nodo
 async function cambiarEstadoNodo(nodeId, currentStatus) {
-    const newStatus = currentStatus === 1 ? 0 : 1;
-    const actionText = newStatus === 1 ? 'activar' : 'desactivar';
+  const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+  const actionText = newStatus === 'active' ? 'activar' : 'desactivar';
 
-    if (!confirm(`¿Estás seguro de que quieres ${actionText} el nodo con ID ${nodeId}?`)) {
-        return; // El usuario canceló la acción
-    }
+  if (!confirm(`¿Estás seguro de que quieres ${actionText} el nodo con ID ${nodeId}?`)) return;
 
-    try {
-        const response = await fetch(`${apiUrl}/meshlora/node/${nodeId}`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ "status": newStatus })
-        });
-
-        if (response.ok) {
-            console.log(`Estado del nodo ${nodeId} cambiado a ${newStatus} correctamente`);
-            listarNodos(); // Actualizar la lista para reflejar el cambio
-        } else {
-            let errorMessage = `Error al cambiar el estado del nodo ${nodeId}.`;
-            try {
-                const errorData = await response.json();
-                if (errorData && errorData.message) {
-                    errorMessage += ` ${errorData.message}`;
-                } else {
-                    errorMessage += ` Código: ${response.status} - ${response.statusText}`;
-                }
-            } catch (e) {
-                errorMessage += ` Código: ${response.status} - ${response.statusText}`;
-            }
-            console.error(errorMessage);
-            alert(errorMessage);
-        }
-    } catch (error) {
-        console.error('Error de red al cambiar el estado del nodo:', error);
-        alert('Error de red al cambiar el estado del nodo. Verifique su conexión e intente nuevamente.');
-    }
+  try {
+    await apiFetch(`/device-nodes/${nodeId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: newStatus }),
+    });
+    await listarNodos();
+  } catch (err) {
+    console.error('Error al cambiar estado:', err);
+    alert(`Error al cambiar el estado del nodo ${nodeId}. ${String(err.message || err)}`);
+  }
 }
 
-// Función para eliminar un nodo
 async function eliminarNodo(nodeId) {
-    if (confirm(`¿Estás seguro de que quieres eliminar el nodo con ID ${nodeId}?`)) {
-        try {
-            const response = await fetch(`${apiUrl}/meshlora/node/${nodeId}`, {
-                method: 'DELETE'
-            });
+  if (!confirm(`¿Estás seguro de que quieres eliminar el nodo con ID ${nodeId}?`)) return;
 
-            if (response.ok) {
-                console.log(`Nodo con ID ${nodeId} eliminado correctamente`);
-                listarNodos(); // Actualizar la lista después de eliminar
-            } else {
-                let errorMessage = `Error al eliminar el nodo con ID ${nodeId}.`;
-                try {
-                    const errorData = await response.json();
-                    if (errorData && errorData.message) {
-                        errorMessage += ` ${errorData.message}`;
-                    } else {
-                        errorMessage += ` Código: ${response.status} - ${response.statusText}`;
-                    }
-                } catch (e) {
-                    errorMessage += ` Código: ${response.status} - ${response.statusText}`;
-                }
-                console.error(errorMessage);
-                alert(errorMessage);
-            }
-        } catch (error) {
-            console.error('Error de red al eliminar el nodo:', error);
-            alert('Error de red al eliminar el nodo. Verifique su conexión e intente nuevamente.');
-        }
-    }
+  try {
+    await apiFetch(`/device-nodes/${nodeId}`, { method: 'DELETE' });
+    await listarNodos();
+  } catch (err) {
+    console.error('Error al eliminar nodo:', err);
+    alert(`Error al eliminar el nodo ${nodeId}. ${String(err.message || err)}`);
+  }
 }
 
-// Event listeners y carga inicial
-document.addEventListener('DOMContentLoaded', () => {
-    // Solo configurar listeners y cargar datos si no estamos en login.html
-    // La redirección al inicio del script ya maneja el acceso no autenticado.
-    if (window.location.pathname !== "/login.html") {
-        const agregarBtn = document.getElementById('agregarBtn');
-        if (agregarBtn) {
-            agregarBtn.addEventListener('click', agregarNodo);
-        }
+/* ---------- Render ---------- */
+function mostrarNodos(nodos) {
+  const nodeList = document.getElementById('nodeList');
+  nodeList.innerHTML = '';
 
-        // Cargar la lista de nodos al cargar la página (si no es login.html)
-        listarNodos();
+  if (!Array.isArray(nodos) || nodos.length === 0) {
+    const row = nodeList.insertRow();
+    const cell = row.insertCell();
+    cell.colSpan = 6;
+    cell.textContent = 'No hay nodos para mostrar.';
+    cell.style.textAlign = 'center';
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  nodos.forEach(nodo => {
+    const row = document.createElement('tr');
+
+    const idCell = row.insertCell();
+    idCell.textContent = nodo.node_id;
+
+    const modelCell = row.insertCell();
+    modelCell.textContent = nodo.model ?? '';
+
+    const refreshRateCell = row.insertCell();
+    refreshRateCell.textContent = String(nodo.refresh_rate ?? '');
+
+    const statusCell = row.insertCell();
+    const statusBadge = document.createElement('span');
+    statusBadge.classList.add('badge', nodo.status === "active" ? 'bg-success' : 'bg-danger');
+    statusBadge.textContent = nodo.status === "active" ? 'Activo' : 'Inactivo';
+    statusCell.appendChild(statusBadge);
+
+    const activatedAtCell = row.insertCell();
+    const activatedDate = nodo.activated_at ? new Date(nodo.activated_at) : null;
+    activatedAtCell.textContent = activatedDate ? activatedDate.toLocaleString() : 'N/A';
+    if (activatedDate) {
+      activatedAtCell.setAttribute('data-bs-toggle', 'tooltip');
+      activatedAtCell.setAttribute('data-bs-placement', 'top');
+      activatedAtCell.setAttribute('title', `Fecha exacta: ${activatedDate.toISOString()}`);
     }
+
+    const actionsCell = row.insertCell();
+    actionsCell.classList.add('text-nowrap');
+
+    const eliminarButton = document.createElement('button');
+    eliminarButton.classList.add('btn', 'btn-danger', 'btn-sm');
+    eliminarButton.innerHTML = '<i class="bi bi-trash3-fill"></i> Eliminar';
+    eliminarButton.onclick = () => eliminarNodo(nodo.node_id);
+    eliminarButton.setAttribute('data-bs-toggle', 'tooltip');
+    eliminarButton.setAttribute('data-bs-placement', 'top');
+    eliminarButton.setAttribute('title', 'Eliminar este nodo');
+    actionsCell.appendChild(eliminarButton);
+
+    actionsCell.appendChild(document.createTextNode(' '));
+
+    const cambiarEstadoButton = document.createElement('button');
+    cambiarEstadoButton.classList.add('btn', 'btn-sm', nodo.status === "active" ? 'btn-warning' : 'btn-success');
+    cambiarEstadoButton.innerHTML = nodo.status === "active"
+      ? '<i class="bi bi-toggle-off"></i> Desactivar'
+      : '<i class="bi bi-toggle-on"></i> Activar';
+    cambiarEstadoButton.setAttribute('title', nodo.status === "active" ? 'Desactivar este nodo' : 'Activar este nodo');
+    cambiarEstadoButton.setAttribute('data-bs-toggle', 'tooltip');
+    cambiarEstadoButton.setAttribute('data-bs-placement', 'top');
+    cambiarEstadoButton.onclick = () => cambiarEstadoNodo(nodo.node_id, nodo.status);
+    actionsCell.appendChild(cambiarEstadoButton);
+
+    fragment.appendChild(row);
+  });
+
+  nodeList.appendChild(fragment);
+
+  // Iniciar tooltips una sola vez por render
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.forEach(el => {
+    // eslint-disable-next-line no-undef
+    new bootstrap.Tooltip(el, { container: 'body' });
+  });
+}
+
+/* ---------- Listeners ---------- */
+document.addEventListener('DOMContentLoaded', () => {
+  const onLogin = window.location.pathname.endsWith('/login.html') || window.location.pathname.endsWith('login.html');
+  if (!onLogin) {
+    const agregarBtn = document.getElementById('agregarBtn');
+    if (agregarBtn) agregarBtn.addEventListener('click', agregarNodo);
+    listarNodos();
+    
+    // Inicializar el sistema de timeout de sesión
+    inicializarTimeoutSesion();
+  }
 });
 
-// Función para mostrar los nodos en la tabla (en api.js)
-function mostrarNodos(nodos) {
-    const nodeList = document.getElementById('nodeList');
-    nodeList.innerHTML = ''; // Limpiar la tabla antes de agregar los nodos
+/* ---------- Gestión de Sesión ---------- */
+let timeoutSesion;
+const TIEMPO_INACTIVIDAD = 5 * 60 * 1000; // 5 minutos en milisegundos
 
-    if (!nodos || nodos.length === 0) {
-        const row = nodeList.insertRow();
-        const cell = row.insertCell();
-        cell.colSpan = 6; // Ajustar al número de columnas
-        cell.textContent = 'No hay nodos para mostrar.';
-        cell.style.textAlign = 'center';
-        return;
-    }
+function cerrarSesion() {
+  // Limpiar el localStorage
+  localStorage.removeItem('autenticado');
+  
+  // Limpiar el timeout si existe
+  if (timeoutSesion) {
+    clearTimeout(timeoutSesion);
+  }
+  
+  // Redirigir al login
+  window.location.replace('login.html');
+}
 
-    nodos.forEach(nodo => {
-        const row = nodeList.insertRow();
-        // Animación sutil al añadir la fila (puedes mejorarla o quitarla)
-        // row.style.opacity = 0;
-        // setTimeout(() => row.style.opacity = 1, 50);
+function resetearTimeoutSesion() {
+  // Limpiar el timeout anterior
+  if (timeoutSesion) {
+    clearTimeout(timeoutSesion);
+  }
+  
+  // Crear un nuevo timeout
+  timeoutSesion = setTimeout(() => {
+    alert('Su sesión ha expirado por inactividad. Será redirigido al login.');
+    cerrarSesion();
+  }, TIEMPO_INACTIVIDAD);
+}
 
+function inicializarTimeoutSesion() {
+  // Eventos que resetean el timer de inactividad
+  const eventos = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+  
+  eventos.forEach(evento => {
+    document.addEventListener(evento, resetearTimeoutSesion, true);
+  });
+  
+  // Inicializar el primer timeout
+  resetearTimeoutSesion();
+}
 
-        const idCell = row.insertCell();
-        const modelCell = row.insertCell();
-        const refreshRateCell = row.insertCell();
-        const statusCell = row.insertCell();
-        const activatedAtCell = row.insertCell();
-        const actionsCell = row.insertCell();
-        actionsCell.classList.add('text-nowrap'); // Evitar que los botones se partan en dos líneas
+/* ---------- Dashboard en Tiempo Real ---------- */
+async function cargarDashboardRT() {
+  const container = document.getElementById('nodesContainer');
+  const loading = document.getElementById('dashboardLoading');
+  const errorDiv = document.getElementById('dashboardError');
+  
+  if (!container) return;
+  
+  // Mostrar loading
+  loading.style.display = 'block';
+  errorDiv.style.display = 'none';
+  container.innerHTML = '';
+  
+  try {
+    // Obtener nodos y mediciones en paralelo
+    const [nodos, mediciones] = await Promise.all([
+      apiFetch('/device-nodes'),
+      apiFetch('/measurements')
+    ]);
+    
+    // Procesar y mostrar los datos
+    mostrarDashboardRT(nodos, mediciones);
+    
+  } catch (error) {
+    console.error('Error al cargar dashboard:', error);
+    const errorMessage = document.getElementById('errorMessage');
+    errorMessage.textContent = error.message || 'Error desconocido al cargar los datos';
+    errorDiv.style.display = 'block';
+  } finally {
+    loading.style.display = 'none';
+  }
+}
 
-        idCell.textContent = nodo.node_id;
-        modelCell.textContent = nodo.model;
-        refreshRateCell.textContent = nodo.refresh_rate;
+function obtenerUltimaMedicion(mediciones, nodeId, sensorTypeId) {
+  // Filtrar mediciones por nodo y tipo de sensor
+  const medicionesFiltradas = mediciones
+    .filter(m => m.node_id === nodeId && m.sensor_type_id === sensorTypeId)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  
+  return medicionesFiltradas[0] || null;
+}
 
-        // Celda de Estado con Badges
-        const statusBadge = document.createElement('span');
-        statusBadge.classList.add('badge');
-        if (nodo.status === 1) {
-            statusBadge.classList.add('bg-success');
-            statusBadge.textContent = 'Activo';
-        } else {
-            statusBadge.classList.add('bg-danger'); // Puedes usar bg-secondary o bg-warning si prefieres
-            statusBadge.textContent = 'Inactivo';
-        }
-        statusCell.appendChild(statusBadge);
+function formatearValorSensor(valor, sensorTypeId) {
+  if (!valor) return 'N/A';
+  
+  const num = parseFloat(valor);
+  if (isNaN(num)) return 'N/A';
+  
+  switch (sensorTypeId) {
+    case 1: // Temperatura
+      return `${num.toFixed(1)}°C`;
+    case 2: // Humedad
+      return `${num.toFixed(1)}%`;
+    case 3: // Presión
+      return `${num.toFixed(1)} hPa`;
+    default:
+      return num.toFixed(2);
+  }
+}
 
-        // Celda Activado En con Tooltip
-        const activatedDate = nodo.activated_at ? new Date(nodo.activated_at) : null;
-        activatedAtCell.textContent = activatedDate ? activatedDate.toLocaleString() : 'N/A';
-        if (activatedDate) {
-            activatedAtCell.setAttribute('data-bs-toggle', 'tooltip');
-            activatedAtCell.setAttribute('data-bs-placement', 'top');
-            activatedAtCell.setAttribute('title', `Fecha exacta: ${activatedDate.toISOString()}`);
-        }
+function obtenerIconoSensor(sensorTypeId) {
+  switch (sensorTypeId) {
+    case 1: return 'bi-thermometer-half'; // Temperatura
+    case 2: return 'bi-droplet-half'; // Humedad
+    case 3: return 'bi-speedometer2'; // Presión
+    default: return 'bi-question-circle';
+  }
+}
 
+function obtenerNombreSensor(sensorTypeId) {
+  switch (sensorTypeId) {
+    case 1: return 'Temperatura';
+    case 2: return 'Humedad';
+    case 3: return 'Presión';
+    default: return 'Desconocido';
+  }
+}
 
-        // Botón para Eliminar Nodo con Icono y Tooltip
-        const eliminarButton = document.createElement('button');
-        eliminarButton.classList.add('btn', 'btn-danger', 'btn-sm');
-        eliminarButton.innerHTML = '<i class="bi bi-trash3-fill"></i> Eliminar';
-        eliminarButton.onclick = () => eliminarNodo(nodo.node_id);
-        eliminarButton.setAttribute('data-bs-toggle', 'tooltip');
-        eliminarButton.setAttribute('data-bs-placement', 'top');
-        eliminarButton.setAttribute('title', 'Eliminar este nodo');
-        actionsCell.appendChild(eliminarButton);
+function mostrarDashboardRT(nodos, mediciones) {
+  const container = document.getElementById('nodesContainer');
+  container.innerHTML = '';
+  
+  if (!Array.isArray(nodos) || nodos.length === 0) {
+    container.innerHTML = `
+      <div class="col-12">
+        <div class="alert alert-info text-center">
+          <i class="bi bi-info-circle"></i>
+          No hay nodos registrados en el sistema.
+        </div>
+      </div>
+    `;
+    return;
+  }
+  
+  nodos.forEach(nodo => {
+    // Obtener últimas mediciones para cada tipo de sensor
+    const tempMedicion = obtenerUltimaMedicion(mediciones, nodo.node_id, 1);
+    const humMedicion = obtenerUltimaMedicion(mediciones, nodo.node_id, 2);
+    const presMedicion = obtenerUltimaMedicion(mediciones, nodo.node_id, 3);
+    
+    // Determinar la fecha de activación
+    const fechaActivacion = nodo.activated_at 
+      ? new Date(nodo.activated_at).toLocaleString() 
+      : 'No especificada';
+    
+    // Crear la tarjeta del nodo
+    const nodeCard = document.createElement('div');
+    nodeCard.className = 'col-lg-4 col-md-6 col-sm-12';
+    
+    nodeCard.innerHTML = `
+      <div class="node-card">
+        <div class="node-card-header">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="bi bi-router"></i> ${nodo.model || 'Sin modelo'}
+            </h5>
+            <span class="node-status-badge ${nodo.status === 'active' ? 'bg-success' : 'bg-danger'}">
+              ${nodo.status === 'active' ? 'Activo' : 'Inactivo'}
+            </span>
+          </div>
+          <small class="opacity-75">ID: ${nodo.node_id}</small>
+        </div>
+        <div class="node-card-body">
+          <div class="mb-3">
+            <small class="text-muted">
+              <i class="bi bi-calendar3"></i> 
+              Activado: ${fechaActivacion}
+            </small>
+          </div>
+          
+          <div class="sensor-reading">
+            <div class="sensor-label">
+              <i class="bi ${obtenerIconoSensor(1)}"></i>
+              ${obtenerNombreSensor(1)}
+            </div>
+            <div class="sensor-value">
+              ${formatearValorSensor(tempMedicion?.value, 1)}
+            </div>
+          </div>
+          
+          <div class="sensor-reading">
+            <div class="sensor-label">
+              <i class="bi ${obtenerIconoSensor(2)}"></i>
+              ${obtenerNombreSensor(2)}
+            </div>
+            <div class="sensor-value">
+              ${formatearValorSensor(humMedicion?.value, 2)}
+            </div>
+          </div>
+          
+          <div class="sensor-reading">
+            <div class="sensor-label">
+              <i class="bi ${obtenerIconoSensor(3)}"></i>
+              ${obtenerNombreSensor(3)}
+            </div>
+            <div class="sensor-value">
+              ${formatearValorSensor(presMedicion?.value, 3)}
+            </div>
+          </div>
+          
+          ${tempMedicion || humMedicion || presMedicion ? `
+            <div class="timestamp-info">
+              <i class="bi bi-clock"></i>
+              Última lectura: ${new Date(
+                Math.max(
+                  new Date(tempMedicion?.timestamp || 0),
+                  new Date(humMedicion?.timestamp || 0),
+                  new Date(presMedicion?.timestamp || 0)
+                )
+              ).toLocaleString()}
+            </div>
+          ` : `
+            <div class="timestamp-info text-warning">
+              <i class="bi bi-exclamation-triangle"></i>
+              Sin datos de sensores disponibles
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+    
+    container.appendChild(nodeCard);
+  });
+}
 
-        actionsCell.appendChild(document.createTextNode(' ')); // Espacio
-
-        // Botón para Cambiar Estado del Nodo con Icono y Tooltip
-        const cambiarEstadoButton = document.createElement('button');
-        cambiarEstadoButton.classList.add('btn', 'btn-sm');
-        if (nodo.status === 1) {
-            cambiarEstadoButton.classList.add('btn-warning');
-            cambiarEstadoButton.innerHTML = '<i class="bi bi-toggle-off"></i> Desactivar';
-            cambiarEstadoButton.setAttribute('title', 'Desactivar este nodo');
-        } else {
-            cambiarEstadoButton.classList.add('btn-success');
-            cambiarEstadoButton.innerHTML = '<i class="bi bi-toggle-on"></i> Activar';
-            cambiarEstadoButton.setAttribute('title', 'Activar este nodo');
-        }
-        cambiarEstadoButton.onclick = () => cambiarEstadoNodo(nodo.node_id, nodo.status);
-        cambiarEstadoButton.setAttribute('data-bs-toggle', 'tooltip');
-        cambiarEstadoButton.setAttribute('data-bs-placement', 'top');
-        actionsCell.appendChild(cambiarEstadoButton);
-    });
-
-    // Reinicializar los tooltips de Bootstrap después de modificar el DOM
-    // Esto se puede mover a una función en main.js si es necesario en más sitios
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        // AÑADE LA OPCIÓN container: 'body' AQUÍ:
-        return new bootstrap.Tooltip(tooltipTriggerEl, {
-            container: 'body'
-        });
-    });
+function actualizarDashboardRT() {
+  cargarDashboardRT();
 }
