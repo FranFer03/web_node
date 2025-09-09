@@ -1,4 +1,4 @@
-const apiUrl = 'https://159.112.185.90';
+const apiUrl = 'http://159.112.185.90:3000';
 
 /* ---------- Guard de autenticación ---------- */
 (function guardAuth() {
