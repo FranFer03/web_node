@@ -1,4 +1,4 @@
-const apiUrl = 'http://159.112.185.90';
+const apiUrl = 'https://api.utnmesh.online';
 
 /* ---------- Guard de autenticación ---------- */
 (function guardAuth() {
@@ -349,113 +349,290 @@ function obtenerNombreSensor(sensorTypeId) {
   }
 }
 
+function obtenerCoordenadas(mediciones, nodeId) {
+  // Obtener latitud (sensor_type_id: 4) y longitud (sensor_type_id: 5)
+  const latMedicion = obtenerUltimaMedicion(mediciones, nodeId, 4);
+  const lngMedicion = obtenerUltimaMedicion(mediciones, nodeId, 5);
+  
+  if (latMedicion && lngMedicion) {
+    const lat = parseFloat(latMedicion.value);
+    const lng = parseFloat(lngMedicion.value);
+    
+    // Validar que las coordenadas sean válidas
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return {
+        lat: lat,
+        lng: lng,
+        formatted: `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+      };
+    }
+  }
+  
+  // Coordenadas por defecto si no hay datos válidos
+  return null;
+}
+
+function generarMapaURL(lat, lng, zoom = 15) {
+  // Usar OpenStreetMap con Leaflet a través de un iframe embebido
+  // Crear una URL para mostrar el mapa estático usando un servicio de mapas
+  const mapHTML = `
+    <div style="width: 100%; height: 100%; position: relative;">
+      <iframe 
+        width="100%" 
+        height="100%" 
+        frameborder="0" 
+        scrolling="no" 
+        marginheight="0" 
+        marginwidth="0" 
+        src="https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.01},${lat-0.01},${lng+0.01},${lat+0.01}&layer=mapnik&marker=${lat},${lng}"
+        style="border: none;">
+      </iframe>
+    </div>
+  `;
+  return mapHTML;
+}
+
 function mostrarDashboardRT(nodos, mediciones) {
   const container = document.getElementById('nodesContainer');
   container.innerHTML = '';
   
   if (!Array.isArray(nodos) || nodos.length === 0) {
     container.innerHTML = `
-      <div class="col-12">
-        <div class="alert alert-info text-center">
-          <i class="bi bi-info-circle"></i>
-          No hay nodos registrados en el sistema.
-        </div>
+      <div class="alert alert-info text-center" style="width: 100%; margin: 20px;">
+        <i class="bi bi-info-circle"></i>
+        No hay nodos registrados en el sistema.
       </div>
     `;
     return;
   }
   
-  nodos.forEach(nodo => {
+  // Ordenar nodos por node_id de manera ascendente
+  const nodosOrdenados = [...nodos].sort((a, b) => a.node_id - b.node_id);
+  
+  nodosOrdenados.forEach(nodo => {
     // Obtener últimas mediciones para cada tipo de sensor
     const tempMedicion = obtenerUltimaMedicion(mediciones, nodo.node_id, 1);
     const humMedicion = obtenerUltimaMedicion(mediciones, nodo.node_id, 2);
     const presMedicion = obtenerUltimaMedicion(mediciones, nodo.node_id, 3);
+    
+    // Obtener coordenadas reales
+    const coordenadas = obtenerCoordenadas(mediciones, nodo.node_id);
     
     // Determinar la fecha de activación
     const fechaActivacion = nodo.activated_at 
       ? new Date(nodo.activated_at).toLocaleString() 
       : 'No especificada';
     
-    // Crear la tarjeta del nodo
+    // Obtener la última lectura más reciente
+    const ultimaLectura = Math.max(
+      new Date(tempMedicion?.timestamp || 0),
+      new Date(humMedicion?.timestamp || 0),
+      new Date(presMedicion?.timestamp || 0)
+    );
+    
+    // Crear la tarjeta del nodo con el nuevo diseño
     const nodeCard = document.createElement('div');
-    nodeCard.className = 'col-lg-4 col-md-6 col-sm-12';
+    nodeCard.className = 'node-card';
     
     nodeCard.innerHTML = `
-      <div class="node-card">
-        <div class="node-card-header">
-          <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-              <i class="bi bi-router"></i> ${nodo.model || 'Sin modelo'}
-            </h5>
-            <span class="node-status-badge ${nodo.status === 'active' ? 'bg-success' : 'bg-danger'}">
-              ${nodo.status === 'active' ? 'Activo' : 'Inactivo'}
-            </span>
-          </div>
-          <small class="opacity-75">ID: ${nodo.node_id}</small>
+      <div class="node-card-header">
+        <div class="d-flex justify-content-between align-items-center">
+          <span>${nodo.model || `Nodo ${nodo.node_id}`}</span>
+          <span class="status-badge-large ${nodo.status === 'active' ? 'active' : 'inactive'}">
+            ${nodo.status === 'active' ? 'Activo' : 'Inactivo'}
+          </span>
         </div>
-        <div class="node-card-body">
-          <div class="mb-3">
-            <small class="text-muted">
-              <i class="bi bi-calendar3"></i> 
-              Activado: ${fechaActivacion}
-            </small>
+      </div>
+      
+      <div class="node-card-body">
+        <div class="node-map-container" id="map-container-${nodo.node_id}">
+          ${coordenadas ? 
+            `<div class="map-loading">
+               <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+               <small class="d-block mt-2">Cargando mapa...</small>
+             </div>` : 
+            `<div class="node-map-placeholder">
+               <i class="bi bi-geo-alt-fill" style="font-size: 2em; color: #3b82f6;"></i>
+               <div style="margin-left: 10px;">
+                 <div>Sin coordenadas</div>
+                 <small>Ubicación no disponible</small>
+               </div>
+             </div>`
+          }
+          <div class="node-coordinates">
+            ${coordenadas ? coordenadas.formatted : 'Coordenadas no disponibles'}
           </div>
-          
-          <div class="sensor-reading">
-            <div class="sensor-label">
-              <i class="bi ${obtenerIconoSensor(1)}"></i>
-              ${obtenerNombreSensor(1)}
+        </div>
+        
+        <div class="sensor-metrics">
+          <!-- Temperatura (métrica principal) -->
+          <div class="metric-large primary">
+            <i class="bi bi-thermometer-half metric-icon"></i>
+            <div class="metric-value">
+              ${tempMedicion ? parseFloat(tempMedicion.value).toFixed(1) : '--'}
             </div>
-            <div class="sensor-value">
-              ${formatearValorSensor(tempMedicion?.value, 1)}
-            </div>
-          </div>
-          
-          <div class="sensor-reading">
-            <div class="sensor-label">
-              <i class="bi ${obtenerIconoSensor(2)}"></i>
-              ${obtenerNombreSensor(2)}
-            </div>
-            <div class="sensor-value">
-              ${formatearValorSensor(humMedicion?.value, 2)}
-            </div>
-          </div>
-          
-          <div class="sensor-reading">
-            <div class="sensor-label">
-              <i class="bi ${obtenerIconoSensor(3)}"></i>
-              ${obtenerNombreSensor(3)}
-            </div>
-            <div class="sensor-value">
-              ${formatearValorSensor(presMedicion?.value, 3)}
+            <div class="metric-label">
+              ${tempMedicion ? '°C' : 'Sin datos'}<br>
+              <small style="font-size: 0.8em; opacity: 0.8;">Temperatura</small>
             </div>
           </div>
           
-          ${tempMedicion || humMedicion || presMedicion ? `
-            <div class="timestamp-info">
-              <i class="bi bi-clock"></i>
-              Última lectura: ${new Date(
-                Math.max(
-                  new Date(tempMedicion?.timestamp || 0),
-                  new Date(humMedicion?.timestamp || 0),
-                  new Date(presMedicion?.timestamp || 0)
-                )
-              ).toLocaleString()}
+          <!-- Humedad -->
+          <div class="metric-large">
+            <i class="bi bi-droplet-half metric-icon"></i>
+            <div class="metric-value">
+              ${humMedicion ? parseFloat(humMedicion.value).toFixed(0) : '--'}
             </div>
-          ` : `
-            <div class="timestamp-info text-warning">
-              <i class="bi bi-exclamation-triangle"></i>
-              Sin datos de sensores disponibles
+            <div class="metric-label">
+              ${humMedicion ? '%' : 'Sin datos'}<br>
+              <small style="font-size: 0.8em;">Humedad</small>
             </div>
-          `}
+          </div>
+          
+          <!-- Presión -->
+          <div class="metric-large">
+            <i class="bi bi-speedometer2 metric-icon"></i>
+            <div class="metric-value">
+              ${presMedicion ? parseFloat(presMedicion.value).toFixed(0) : '--'}
+            </div>
+            <div class="metric-label">
+              ${presMedicion ? 'hPa' : 'Sin datos'}<br>
+              <small style="font-size: 0.8em;">Presión</small>
+            </div>
+          </div>
+          
+          <div class="node-status-info">
+            <div>
+              <small class="text-muted">
+                <i class="bi bi-router"></i> 
+                Node ID: ${nodo.node_id || 'Sin modelo'}
+              </small>
+            </div>
+            ${ultimaLectura > 0 ? `
+              <div class="last-update">
+                <i class="bi bi-clock"></i>
+                ${new Date(ultimaLectura).toLocaleTimeString()}
+              </div>
+            ` : `
+              <div class="last-update text-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                Sin datos
+              </div>
+            `}
+          </div>
         </div>
       </div>
     `;
     
     container.appendChild(nodeCard);
+    
+    // Cargar el mapa si hay coordenadas válidas
+    if (coordenadas) {
+      setTimeout(() => {
+        cargarMapaEnContenedor(nodo.node_id, coordenadas.lat, coordenadas.lng);
+      }, 100);
+    }
   });
+  
+  // Actualizar estado de los botones de navegación
+  actualizarBotonesNavegacion();
+}
+
+function cargarMapaEnContenedor(nodeId, lat, lng) {
+  const mapContainer = document.getElementById(`map-container-${nodeId}`);
+  if (!mapContainer) return;
+  
+  const mapHTML = generarMapaURL(lat, lng);
+  
+  // Simular carga del mapa con un pequeño delay
+  setTimeout(() => {
+    mapContainer.innerHTML = mapHTML + `
+      <div class="node-coordinates">
+        ${lat.toFixed(5)}, ${lng.toFixed(5)}
+      </div>
+    `;
+  }, 500);
+}
+
+function scrollDashboard(direction) {
+  const container = document.getElementById('nodesContainer');
+  
+  // Calcular el scroll dinámicamente basado en el ancho actual de las cajas
+  const firstCard = container.querySelector('.node-card');
+  let scrollAmount = 474; // Valor por defecto
+  
+  if (firstCard) {
+    const cardStyle = window.getComputedStyle(firstCard);
+    const cardWidth = parseFloat(cardStyle.width);
+    const containerStyle = window.getComputedStyle(container);
+    const gap = parseFloat(containerStyle.gap) || 24;
+    scrollAmount = cardWidth + gap;
+  }
+  
+  if (direction === 'left') {
+    container.scrollBy({
+      left: -scrollAmount,
+      behavior: 'smooth'
+    });
+  } else {
+    container.scrollBy({
+      left: scrollAmount,
+      behavior: 'smooth'
+    });
+  }
+  
+  // Actualizar botones después de un pequeño delay para que el scroll termine
+  setTimeout(actualizarBotonesNavegacion, 300);
+}
+
+function actualizarBotonesNavegacion() {
+  const container = document.getElementById('nodesContainer');
+  const leftBtn = document.getElementById('btnScrollLeft');
+  const rightBtn = document.getElementById('btnScrollRight');
+  
+  if (!container || !leftBtn || !rightBtn) return;
+  
+  // Verificar si podemos scrollear a la izquierda
+  leftBtn.disabled = container.scrollLeft <= 0;
+  
+  // Verificar si podemos scrollear a la derecha
+  const maxScrollLeft = container.scrollWidth - container.clientWidth;
+  rightBtn.disabled = container.scrollLeft >= maxScrollLeft - 5; // -5 para compensar pequeños errores de redondeo
+}
+
+// Agregar event listener para actualizar botones cuando el usuario haga scroll manual
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.getElementById('nodesContainer');
+  if (container) {
+    container.addEventListener('scroll', actualizarBotonesNavegacion);
+  }
+});
+
+function generarCoordenadasFicticias(nodeId) {
+  // Generar coordenadas ficticias basadas en el ID del nodo
+  const baseLatitud = -26.817;
+  const baseLongitud = 65.199;
+  
+  // Usar el nodeId para generar variaciones consistentes
+  const offsetLat = ((nodeId * 7) % 100) / 10000; // Variación pequeña en latitud
+  const offsetLng = ((nodeId * 11) % 100) / 10000; // Variación pequeña en longitud
+  
+  const latitud = (baseLatitud + offsetLat).toFixed(5);
+  const longitud = (baseLongitud + offsetLng).toFixed(5);
+  
+  return `${latitud}, ${longitud}`;
 }
 
 function actualizarDashboardRT() {
   cargarDashboardRT();
 }
+
+// Inicializar event listeners cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.getElementById('nodesContainer');
+  if (container) {
+    container.addEventListener('scroll', actualizarBotonesNavegacion);
+    // Inicializar estado de botones
+    setTimeout(actualizarBotonesNavegacion, 100);
+  }
+});

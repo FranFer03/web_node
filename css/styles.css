@@ -2,7 +2,7 @@
 body {
   font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
   margin: 0;
-  background: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 100%);
+  background: #ffffff;
   color: #222;
   min-height: 100vh;
 }
@@ -185,73 +185,363 @@ footer {
 }
 
 /* Estilos para Dashboard en Tiempo Real */
+.dashboard-scroll-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 0;
+  max-width: 100%;
+}
+
+#nodesContainer {
+  display: flex;
+  gap: 24px;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+  padding: 0 10px;
+}
+
+#nodesContainer::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 .node-card {
   background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(37, 99, 235, 0.12);
   border: 1px solid #e5e7eb;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.3s, box-shadow 0.3s;
+  overflow: hidden;
+  min-height: 520px;
+  width: calc((100vw - 180px) / 3 - 24px);
+  max-width: 480px;
+  min-width: 380px;
+  flex-shrink: 0;
+}
+
+.dashboard-nav-btn {
+  background: linear-gradient(135deg, #2563eb 60%, #60a5fa 100%);
+  border: none;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.dashboard-nav-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8 60%, #2563eb 100%);
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+}
+
+.dashboard-nav-btn:active {
+  transform: scale(0.95);
+}
+
+.dashboard-nav-btn:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-nav-btn i {
+  margin: 0;
+  padding: 0;
+}
+
+/* Estilos responsivos para dashboard */
+@media (max-width: 1400px) {
+  .node-card {
+    width: calc((100vw - 160px) / 3 - 24px);
+    min-width: 320px;
+    max-width: 420px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .node-card {
+    width: calc((100vw - 140px) / 2 - 24px);
+    min-width: 350px;
+    max-width: 450px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-scroll-wrapper {
+    gap: 10px;
+  }
+  
+  .dashboard-nav-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  
+  .node-card {
+    width: calc(100vw - 120px);
+    min-width: 280px;
+    max-width: none;
+  }
+  
+  #nodesContainer {
+    gap: 16px;
+    padding: 0 5px;
+  }
 }
 
 .node-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 48px rgba(37, 99, 235, 0.16);
 }
 
 .node-card-header {
-  background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
   color: #fff;
-  padding: 16px 20px;
-  border-radius: 12px 12px 0 0;
-  font-weight: 600;
+  padding: 20px;
+  font-weight: 700;
   letter-spacing: 0.5px;
+  font-size: 1.2em;
+  text-align: center;
 }
 
 .node-card-body {
-  padding: 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 80px);
 }
 
-.sensor-reading {
-  background: #f8fafc;
+.node-map-container {
+  height: 200px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 2px solid #f1f5f9;
+  position: relative;
+  overflow: hidden;
+}
+
+.node-map-placeholder {
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(circle at 30% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+  background-size: 100% 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9em;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.node-map-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+}
+
+.map-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 20px;
   border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  border-left: 4px solid #2563eb;
+  text-align: center;
+}
+
+.node-coordinates {
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
+  font-size: 0.75em;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.sensor-metrics {
+  padding: 20px;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto auto;
+  gap: 16px;
+  align-content: start;
+}
+
+.metric-large {
+  grid-column: span 1;
+  text-align: center;
+  padding: 20px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  position: relative;
+}
+
+.metric-large.primary {
+  grid-column: span 2;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  transform: scale(1.02);
+}
+
+.metric-value {
+  font-size: 2.2em;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 8px;
+  color: #1e293b;
+}
+
+.metric-large.primary .metric-value {
+  color: white;
+  font-size: 2.8em;
+}
+
+.metric-label {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-large.primary .metric-label {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.metric-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 1.2em;
+  opacity: 0.3;
+}
+
+.metric-large.primary .metric-icon {
+  opacity: 0.5;
+  color: white;
+}
+
+.node-status-info {
+  grid-column: span 2;
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.sensor-reading:last-child {
-  margin-bottom: 0;
-}
-
-.sensor-label {
-  font-weight: 600;
-  color: #374151;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sensor-value {
-  font-weight: 700;
-  color: #2563eb;
-  font-size: 1.1em;
-}
-
-.node-status-badge {
-  font-size: 0.85em;
-  padding: 0.4em 0.8em;
-  border-radius: 12px;
-  font-weight: 600;
-}
-
-.timestamp-info {
-  font-size: 0.85em;
-  color: #6b7280;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
   margin-top: 8px;
+}
+
+.status-badge-large {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9em;
+  letter-spacing: 0.3px;
+}
+
+.status-badge-large.active {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+}
+
+.status-badge-large.inactive {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+}
+
+.last-update {
+  font-size: 0.8em;
+  color: #64748b;
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* Controles de navegación horizontal */
+.dashboard-nav-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.nav-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.nav-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.scroll-indicator {
+  text-align: center;
+  font-size: 0.85em;
+  color: #64748b;
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .node-card {
+    min-height: 480px;
+    min-width: 350px;
+    max-width: 350px;
+  }
+  
+  .sensor-metrics {
+    padding: 16px;
+    gap: 12px;
+  }
+  
+  .metric-value {
+    font-size: 1.8em;
+  }
+  
+  .metric-large.primary .metric-value {
+    font-size: 2.2em;
+  }
 }

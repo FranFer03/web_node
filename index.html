@@ -105,8 +105,32 @@
                 <strong>Error:</strong> <span id="errorMessage"></span>
             </div>
             
-            <div id="nodesContainer" class="row g-4">
-                <!-- Las tarjetas de nodos se generarán dinámicamente aquí -->
+            <!-- Contenedor con navegación lateral -->
+            <div class="dashboard-scroll-wrapper">
+                <button id="btnScrollLeft" class="dashboard-nav-btn" onclick="scrollDashboard('left')">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                
+                <div id="nodesContainer">
+                    <!-- Las tarjetas de nodos se generarán dinámicamente aquí -->
+                </div>
+                
+                <button id="btnScrollRight" class="dashboard-nav-btn" onclick="scrollDashboard('right')">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+            
+            <div class="dashboard-nav-controls">
+                <button id="scrollLeft" class="nav-btn" onclick="scrollDashboard('left')">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <button id="scrollRight" class="nav-btn" onclick="scrollDashboard('right')">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+            
+            <div class="scroll-indicator">
+                <small><i class="bi bi-mouse"></i> Desliza horizontalmente para ver más estaciones</small>
             </div>
         </div>
 

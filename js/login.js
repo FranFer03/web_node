@@ -1,4 +1,4 @@
-const API_URL = "http://159.112.185.90";
+const API_URL = "https://api.utnmesh.online";
 
 if (window.location.pathname !== "/login.html" &&
   localStorage.getItem("autenticado") !== "true") {
