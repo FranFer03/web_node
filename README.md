@@ -88,6 +88,6 @@ npm run dev
 npm run build
 ```
 
-## Nota
+## Estado del repositorio
 
-Se conservaron archivos legacy (`js/`, `css/`, `login.html`, etc.) para referencia del template original, pero el flujo principal ahora corre en React desde `index.html` + `src/main.jsx`.
+El repositorio contiene unicamente la aplicacion React (Vite) y los recursos necesarios para su ejecucion.
