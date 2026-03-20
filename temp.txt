@@ -1,0 +1,63 @@
+[
+  {
+    "name": "Longitud",
+    "description": "Ubicacion del nodo",
+    "unit_of_measure": "°",
+    "min_value": "-180.0000",
+    "max_value": "180.0000",
+    "precision_digits": 2,
+    "is_active": true,
+    "sensor_type_id": 5,
+    "created_at": null,
+    "updated_at": null
+  },
+  {
+    "name": "Pressure",
+    "description": "Sensor de presion atmosferico",
+    "unit_of_measure": "hPa",
+    "min_value": "300.0000",
+    "max_value": "1100.0000",
+    "precision_digits": 2,
+    "is_active": true,
+    "sensor_type_id": 3,
+    "created_at": "2025-10-10T04:23:38",
+    "updated_at": "2025-10-10T04:23:38"
+  },
+  {
+    "name": "Latitud",
+    "description": "Ubicacion del nodo",
+    "unit_of_measure": "°",
+    "min_value": "-90.0000",
+    "max_value": "90.0000",
+    "precision_digits": 2,
+    "is_active": true,
+    "sensor_type_id": 4,
+    "created_at": "2025-10-10T04:23:38",
+    "updated_at": "2025-10-10T04:23:38"
+  },
+  {
+    "name": "Temperature",
+    "description": "Sensor de temperatura ambiente con update",
+    "unit_of_measure": "°C",
+    "min_value": "-40.0000",
+    "max_value": "85.0000",
+    "precision_digits": 2,
+    "is_active": true,
+    "sensor_type_id": 1,
+    "created_at": "2025-10-10T04:23:37",
+    "updated_at": "2025-10-10T04:23:37"
+  },
+  {
+    "name": "Humidity",
+    "description": "Sensor de humedad relativa",
+    "unit_of_measure": "%",
+    "min_value": "0.0000",
+    "max_value": "100.0000",
+    "precision_digits": 2,
+    "is_active": true,
+    "sensor_type_id": 2,
+    "created_at": "2025-10-10T04:23:37",
+    "updated_at": "2025-10-10T04:23:37"
+  }
+
+-26.926628149795036, -65.3382905555436

@@ -3,12 +3,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { loginUser } from "../lib/api";
 import { setAuthState } from "../lib/auth";
 import { useThemeLang } from "../contexts/ThemeLangContext";
+import BrandLogo from "../components/BrandLogo";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useThemeLang();
-  
+  const { t, theme, toggleTheme, language, changeLanguage } = useThemeLang();
+  const toggleLanguage = () => changeLanguage(language === "es" ? "en" : "es");
+
   const [form, setForm] = useState({ usuario: "", contrasena: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,8 +41,24 @@ export default function LoginPage() {
     <div className="login-page">
       <header className="login-header">
         <div className="landing-brand">
-          <span>UTN * TUC</span>
+          <BrandLogo className="landing-brand-logo" />
           <strong>LoRa Mesh Monitor</strong>
+        </div>
+        <div className="landing-controls">
+          <button
+            className={`btn-outline theme-toggle ${theme === "dark" ? "is-dark" : "is-light"}`}
+            onClick={toggleTheme}
+            aria-label={t("Change theme")}
+            type="button"
+          >
+            <span className="material-symbols-outlined theme-icon">
+              {theme === "dark" ? "light_mode" : "dark_mode"}
+            </span>
+          </button>
+          <button type="button" className="lang-toggle" onClick={toggleLanguage} aria-label={t("Change language")}>
+            <span className={language === "es" ? "active" : ""}>ES</span>
+            <span className={language === "en" ? "active" : ""}>EN</span>
+          </button>
         </div>
       </header>
 

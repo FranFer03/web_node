@@ -1,15 +1,17 @@
 import { useNavigate } from "react-router-dom";
 import { useThemeLang } from "../contexts/ThemeLangContext";
+import BrandLogo from "../components/BrandLogo";
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const { t, theme, toggleTheme, language, changeLanguage } = useThemeLang();
+  const toggleLanguage = () => changeLanguage(language === "es" ? "en" : "es");
 
   return (
     <div className="landing-page">
       <header className="landing-header">
         <div className="landing-brand">
-          <span>UTN * TUC</span>
+          <BrandLogo className="landing-brand-logo" />
           <strong>LoRa Mesh Monitor</strong>
         </div>
         <nav>
@@ -17,22 +19,21 @@ export default function LandingPage() {
           <a href="#solutions">{t("Solutions")}</a>
           <a href="#docs">{t("Documentation")}</a>
         </nav>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button 
-            className="btn-outline" 
-            style={{ padding: '0.3rem 0.6rem', border: '1px solid var(--border)', color: 'var(--text)', background: 'transparent', cursor: 'pointer' }} 
+        <div className="landing-controls">
+          <button
+            className={`btn-outline theme-toggle ${theme === "dark" ? "is-dark" : "is-light"}`}
             onClick={toggleTheme}
+            aria-label={t("Change theme")}
+            type="button"
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            <span className="material-symbols-outlined theme-icon">
+              {theme === "dark" ? "light_mode" : "dark_mode"}
+            </span>
           </button>
-          <select 
-             value={language} 
-             onChange={(e) => changeLanguage(e.target.value)}
-             style={{ background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem', cursor: 'pointer' }}
-          >
-            <option value="es">ES</option>
-            <option value="en">EN</option>
-          </select>
+          <button type="button" className="lang-toggle" onClick={toggleLanguage} aria-label={t("Change language")}>
+            <span className={language === "es" ? "active" : ""}>ES</span>
+            <span className={language === "en" ? "active" : ""}>EN</span>
+          </button>
           <button className="btn-outline" onClick={() => navigate("/login")}>{t("Sign up")}</button>
         </div>
       </header>
@@ -93,9 +94,10 @@ export default function LandingPage() {
           <a href="#">{t("Privacy Policy")}</a>
           <a href="#">{t("Terms of Service")}</a>
           <a href="#">{t("API Keys")}</a>
-          <a href="#">Status</a>
+          <a href="#">{t("Status")}</a>
         </div>
       </footer>
     </div>
   );
 }
+
