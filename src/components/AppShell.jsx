@@ -11,7 +11,11 @@ export default function AppShell() {
   const avatarUrl = resolveAvatarUrl(user);
   const { theme, toggleTheme, language, changeLanguage, t } = useThemeLang();
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const toggleLanguage = () => changeLanguage(language === "es" ? "en" : "es");
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const closeSidebar = () => setIsSidebarOpen(false);
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -37,7 +41,13 @@ export default function AppShell() {
 
   return (
     <div className="app-layout">
-      <aside className="sidebar">
+      {/* Mobile Overlay */}
+      <div 
+        className={`mobile-overlay ${isSidebarOpen ? 'open' : ''}`} 
+        onClick={closeSidebar}
+      />
+      
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="brand-block">
           <div>
             <BrandLogo className="sidebar-brand-logo" />
@@ -49,6 +59,7 @@ export default function AppShell() {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={closeSidebar}
               className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
             >
               <span className="material-symbols-outlined">{item.icon}</span>
@@ -86,7 +97,12 @@ export default function AppShell() {
 
       <main className="main-panel">
         <header className="topbar">
-          <h1>{isDashboardFamily ? "LoRa Mesh Monitor" : "Panel"}</h1>
+          <div className="topbar-left">
+            <button className="menu-toggle" onClick={toggleSidebar} aria-label={t("Toggle Menu") || "Menu"}>
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+            <h1>{isDashboardFamily ? "LoRa Mesh Monitor" : "Panel"}</h1>
+          </div>
           <div className="topbar-actions">
             <button
               className={`btn-outline theme-toggle ${theme === "dark" ? "is-dark" : "is-light"}`}
