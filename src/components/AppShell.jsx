@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { clearAuthState, getAuthState, resolveAvatarUrl } from "../lib/auth";
 import { useThemeLang } from "../contexts/ThemeLangContext";
@@ -11,15 +11,29 @@ export default function AppShell() {
   const avatarUrl = resolveAvatarUrl(user);
   const { theme, toggleTheme, language, changeLanguage, t } = useThemeLang();
   const [avatarFailed, setAvatarFailed] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const toggleLanguage = () => changeLanguage(language === "es" ? "en" : "es");
 
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
-  const closeSidebar = () => setIsSidebarOpen(false);
+  // Desktop: collapsed by default. Mobile: hidden (drawer) by default.
+  const [collapsed, setCollapsed] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const toggleLanguage = () => changeLanguage(language === "es" ? "en" : "es");
+  const sidebarRef = useRef(null);
 
   useEffect(() => {
     setAvatarFailed(false);
   }, [avatarUrl]);
+
+  // Close mobile drawer or collapse desktop sidebar when clicking outside
+  useEffect(() => {
+    function handleOutsideClick(e) {
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) {
+        setMobileOpen(false);
+        setCollapsed(true);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   const navItems = [
     { to: "/dashboard", label: t("Dashboard"), icon: "bar_chart", subtitle: t("Historical") },
@@ -39,71 +53,128 @@ export default function AppShell() {
     location.pathname.startsWith("/nodes-manager") ||
     location.pathname.startsWith("/packet-logs");
 
+  const avatarEl = (
+    <div className="user-avatar">
+      {avatarUrl && !avatarFailed ? (
+        <img
+          src={avatarUrl}
+          alt={`Avatar de ${user?.usuario || "operator"}`}
+          className="user-avatar-image"
+          onError={() => setAvatarFailed(true)}
+        />
+      ) : (
+        <span className="user-avatar-initial">
+          {(user?.usuario || "A").slice(0, 1).toUpperCase()}
+        </span>
+      )}
+    </div>
+  );
+
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${collapsed ? "sidebar-collapsed" : ""}`}>
+
       {/* Mobile Overlay */}
-      <div 
-        className={`mobile-overlay ${isSidebarOpen ? 'open' : ''}`} 
-        onClick={closeSidebar}
+      <div
+        className={`mobile-overlay ${mobileOpen ? "open" : ""}`}
+        onClick={() => setMobileOpen(false)}
       />
-      
-      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+
+      <aside
+        ref={sidebarRef}
+        className={`sidebar ${mobileOpen ? "open" : ""} ${collapsed ? "collapsed" : ""}`}
+      >
+        {/* Brand / Logo block */}
         <div className="brand-block">
-          <div>
-            <BrandLogo className="sidebar-brand-logo" />
-          </div>
+          {!collapsed && (
+            <div>
+              <BrandLogo className="sidebar-brand-logo" />
+            </div>
+          )}
+          {collapsed && (
+            <button
+              className="sidebar-collapse-toggle"
+              onClick={() => setCollapsed(false)}
+              aria-label="Expand sidebar"
+            >
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+          )}
+          {!collapsed && (
+            <button
+              className="sidebar-collapse-toggle sidebar-collapse-toggle--close"
+              onClick={() => setCollapsed(true)}
+              aria-label="Collapse sidebar"
+            >
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+          )}
         </div>
 
+        {/* Navigation */}
         <nav className="sidebar-nav">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              onClick={closeSidebar}
+              onClick={() => setMobileOpen(false)}
+              title={collapsed ? item.label : undefined}
               className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
             >
               <span className="material-symbols-outlined">{item.icon}</span>
-              <div>
-                <span>{item.label}</span>
-                <small>{item.subtitle}</small>
-              </div>
+              {!collapsed && (
+                <div>
+                  <span>{item.label}</span>
+                  <small>{item.subtitle}</small>
+                </div>
+              )}
             </NavLink>
           ))}
         </nav>
 
-        <button className="logout-btn" onClick={logout}>
-          {t("LogoutLabel")}
-        </button>
-
-        <div className="sidebar-user">
-          <div className="user-avatar">
-            {avatarUrl && !avatarFailed ? (
-              <img
-                src={avatarUrl}
-                alt={`Avatar de ${user?.usuario || "operator"}`}
-                className="user-avatar-image"
-                onError={() => setAvatarFailed(true)}
-              />
-            ) : (
-              (user?.usuario || "A").slice(0, 1).toUpperCase()
-            )}
+        {/* Logout + User */}
+        {!collapsed ? (
+          <div className="sidebar-footer">
+            <div className="sidebar-user-pill">
+              {avatarEl}
+              <div className="sidebar-user-info">
+                <p>{user?.usuario || "operator"}</p>
+                <small>{user?.rol || "operator"}</small>
+              </div>
+            </div>
+            <button
+              className="sidebar-logout-icon"
+              onClick={logout}
+              title={t("LogoutLabel") || "Cerrar sesión"}
+              aria-label={t("LogoutLabel") || "Cerrar sesión"}
+            >
+              <span className="material-symbols-outlined">logout</span>
+            </button>
           </div>
-          <div>
-            <p>{user?.usuario || "operator"}</p>
-            <small>{user?.rol || "operator"}</small>
+        ) : (
+          <div className="sidebar-user sidebar-user--mini">
+            {avatarEl}
           </div>
-        </div>
+        )}
       </aside>
 
       <main className="main-panel">
         <header className="topbar">
           <div className="topbar-left">
-            <button className="menu-toggle" onClick={toggleSidebar} aria-label={t("Toggle Menu") || "Menu"}>
+            {/* On mobile: open drawer. On desktop: expand sidebar */}
+            <button
+              className="menu-toggle"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={t("Toggle Menu") || "Menu"}
+            >
               <span className="material-symbols-outlined">menu</span>
             </button>
             <h1>{isDashboardFamily ? "LoRa Mesh Monitor" : "Panel"}</h1>
           </div>
           <div className="topbar-actions">
+            <div className="topbar-connection">
+              <span className="status-dot" />
+              <span>Live</span>
+            </div>
             <button
               className={`btn-outline theme-toggle ${theme === "dark" ? "is-dark" : "is-light"}`}
               onClick={toggleTheme}
@@ -118,10 +189,6 @@ export default function AppShell() {
               <span className={language === "es" ? "active" : ""}>ES</span>
               <span className={language === "en" ? "active" : ""}>EN</span>
             </button>
-            <div className="topbar-connection">
-              <span className="status-dot" />
-              <span>Live</span>
-            </div>
           </div>
         </header>
         <section className="main-content">
