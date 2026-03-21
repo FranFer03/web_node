@@ -565,9 +565,17 @@ input {
 .topbar-connection {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.4rem;
   margin-left: 0.5rem;
   white-space: nowrap;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .status-dot {

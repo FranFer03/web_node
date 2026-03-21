@@ -120,7 +120,7 @@ export default function AppShell() {
             </button>
             <div className="topbar-connection">
               <span className="status-dot" />
-              <span>WebSocket Connected</span>
+              <span>Live</span>
             </div>
           </div>
         </header>
