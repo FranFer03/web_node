@@ -67,33 +67,32 @@ export async function getMeasurements() {
   return apiRequest("/measurements");
 }
 
-export async function getMeasurementsFiltered({ startDate, endDate } = {}) {
-  const params = new URLSearchParams();
-  if (startDate) params.set("start_date", startDate);
-  if (endDate) params.set("end_date", endDate);
-  const query = params.toString();
-  const path = query ? `/measurements/filter?${query}` : "/measurements/filter";
+function filterByDateRange(rows, startDate, endDate) {
+  const startTs = startDate ? new Date(`${startDate}T00:00:00`).getTime() : null;
+  const endTs = endDate ? new Date(`${endDate}T23:59:59.999`).getTime() : null;
+  if (startTs === null && endTs === null) return rows;
 
-  try {
-    return await apiRequest(path);
-  } catch {
-    const allMeasurements = await apiRequest("/measurements");
-    if (!Array.isArray(allMeasurements)) return [];
-    if (!startDate && !endDate) return allMeasurements;
+  return rows.filter((row) => {
+    const rawDate = row?.timestamp || row?.created_at;
+    if (!rawDate) return false;
+    const ts = new Date(rawDate).getTime();
+    if (Number.isNaN(ts)) return false;
+    if (startTs !== null && ts < startTs) return false;
+    if (endTs !== null && ts > endTs) return false;
+    return true;
+  });
+}
 
-    const startTs = startDate ? new Date(`${startDate}T00:00:00`).getTime() : null;
-    const endTs = endDate ? new Date(`${endDate}T23:59:59.999`).getTime() : null;
+export async function getMeasurementsFiltered({ startDate, endDate, nodeId } = {}) {
+  const allRows = await apiRequest("/measurements/filter");
+  const rows = Array.isArray(allRows) ? allRows : [];
+  const filteredByNode =
+    nodeId && nodeId !== "all" ? rows.filter((row) => row.node_id === Number(nodeId)) : rows;
 
-    return allMeasurements.filter((row) => {
-      const rawDate = row?.timestamp || row?.created_at;
-      if (!rawDate) return false;
-      const ts = new Date(rawDate).getTime();
-      if (Number.isNaN(ts)) return false;
-      if (startTs !== null && ts < startTs) return false;
-      if (endTs !== null && ts > endTs) return false;
-      return true;
-    });
-  }
+  return {
+    rows: filterByDateRange(filteredByNode, startDate, endDate),
+    usedFallback: false,
+  };
 }
 
 export async function getSensorTypes() {

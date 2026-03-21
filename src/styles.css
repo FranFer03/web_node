@@ -731,6 +731,27 @@ input {
   fill: none;
   stroke: var(--orange);
   stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trend-area {
+  pointer-events: none;
+}
+
+.trend-grid {
+  stroke: color-mix(in srgb, var(--text-muted) 35%, transparent);
+  stroke-width: 1;
+}
+
+.trend-grid-base {
+  stroke: color-mix(in srgb, var(--text-muted) 55%, transparent);
+}
+
+.trend-label {
+  fill: var(--text-muted);
+  font-size: 9.5px;
+  letter-spacing: 0.15px;
 }
 
 .trend-point {

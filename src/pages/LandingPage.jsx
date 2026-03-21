@@ -15,9 +15,10 @@ export default function LandingPage() {
           <strong>LoRa Mesh Monitor</strong>
         </div>
         <nav>
-          <a href="#features">{t("Features")}</a>
-          <a href="#solutions">{t("Solutions")}</a>
-          <a href="#docs">{t("Documentation")}</a>
+          <a href="#presentacion">Proyecto</a>
+          <a href="#objetivos">Objetivos</a>
+          <a href="#red">Red LoRa Mesh</a>
+          <a href="#aplicaciones">Aplicaciones</a>
         </nav>
         <div className="landing-controls">
           <button
@@ -34,26 +35,27 @@ export default function LandingPage() {
             <span className={language === "es" ? "active" : ""}>ES</span>
             <span className={language === "en" ? "active" : ""}>EN</span>
           </button>
-          <button className="btn-outline" onClick={() => navigate("/login")}>{t("Sign up")}</button>
+          <button className="btn-outline" onClick={() => navigate("/login")}>Ingresar</button>
         </div>
       </header>
 
-      <section className="hero" id="features">
+      <section className="hero" id="presentacion">
         <div>
-          <span className="pill">{t("Industrial 4.0 Standard")}</span>
+          <span className="pill">Proyecto Final - Ingenieria Electronica</span>
           <h1>
-            {t("Visualize and Optimize")}
+            Monitoreo distribuido
             <br />
-            {t("Your")} <span>LoRa Mesh</span> {t("Network")}
+            en <span>LoRa Mesh</span>
           </h1>
           <p>
-            {t("Real-time monitoring and advanced diagnostics for industrial-scale LoRa networks.")}
+            Plataforma orientada a zonas remotas que combina bajo consumo, alcance extendido y
+            comunicacion multisalto para transportar lecturas ambientales hacia un nodo concentrador.
           </p>
           <div className="hero-actions">
             <button className="btn-primary" onClick={() => navigate("/login")}>
-              {t("Start Monitoring")}
+              Ver panel
             </button>
-            <button className="btn-muted">{t("Watch Demo")}</button>
+            <button className="btn-muted">Resumen tecnico</button>
           </div>
         </div>
         <div className="hero-map">
@@ -61,40 +63,60 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="feature-grid" id="solutions">
+      <section className="feature-grid" id="objetivos">
         <article>
-          <span className="material-symbols-outlined">hub</span>
-          <h3>{t("Infinite Scalability")}</h3>
-          <p>{t("Support for thousands of nodes across vast areas without degradation.")}</p>
+          <span className="material-symbols-outlined">flag</span>
+          <h3>Objetivo general</h3>
+          <p>Implementar una red LoRa Mesh funcional para monitoreo en entornos sin infraestructura tradicional.</p>
         </article>
         <article>
-          <span className="material-symbols-outlined">insights</span>
-          <h3>{t("Real-time Data")}</h3>
-          <p>{t("Instant latency tracking and packet delivery metrics with sub-second updates.")}</p>
+          <span className="material-symbols-outlined">route</span>
+          <h3>Objetivo tecnico</h3>
+          <p>Validar comunicaciones multisalto entre nodos y concentrar datos en gateway para visualizacion web.</p>
         </article>
         <article>
-          <span className="material-symbols-outlined">history</span>
-          <h3>{t("Historical Analysis")}</h3>
-          <p>{t("Deep trend analysis to predict failures before they occur.")}</p>
+          <span className="material-symbols-outlined">savings</span>
+          <h3>Objetivo de impacto</h3>
+          <p>Ofrecer una alternativa replicable, de bajo costo operativo y adaptable a distintos escenarios.</p>
         </article>
       </section>
 
-      <section className="cta" id="docs">
-        <h2>{t("Ready to optimize your network?")}</h2>
-        <p>{t("Enter your work email to receive a customized implementation plan.")}</p>
+      <section className="feature-grid" id="red">
+        <article>
+          <span className="material-symbols-outlined">sensors</span>
+          <h3>Nodos distribuidos</h3>
+          <p>Captura de variables ambientales en diferentes puntos de campo.</p>
+        </article>
+        <article>
+          <span className="material-symbols-outlined">device_hub</span>
+          <h3>Comunicacion Mesh</h3>
+          <p>Los datos se enrutan por saltos intermedios para extender cobertura y mejorar resiliencia.</p>
+        </article>
+        <article>
+          <span className="material-symbols-outlined">monitoring</span>
+          <h3>Gateway + plataforma</h3>
+          <p>Centralizacion de datos y visualizacion historica en una interfaz web simple.</p>
+        </article>
+      </section>
+
+      <section className="cta" id="aplicaciones">
+        <h2>Aplicaciones potenciales</h2>
+        <p>
+          Agricultura de precision, monitoreo ambiental, energias renovables e iniciativas academicas
+          que requieren telemetria confiable en zonas remotas.
+        </p>
         <div className="cta-row">
-          <input type="email" placeholder={t("Enter your work email")} />
-          <button className="btn-primary">{t("Get Consulted")}</button>
+          <button className="btn-primary" onClick={() => navigate("/login")}>Ir al sistema</button>
         </div>
       </section>
 
       <footer className="landing-footer">
-        <span>LoRa Mesh Monitor</span>
+        <span>LoRa Mesh Monitor - Red Mesh para monitoreo remoto</span>
         <div>
-          <a href="#">{t("Privacy Policy")}</a>
-          <a href="#">{t("Terms of Service")}</a>
-          <a href="#">{t("API Keys")}</a>
-          <a href="#">{t("Status")}</a>
+          <a href="#presentacion">Proyecto</a>
+          <a href="#objetivos">Objetivos</a>
+          <a href="#red">Arquitectura</a>
+          <a href="#aplicaciones">Aplicaciones</a>
         </div>
       </footer>
     </div>

@@ -6,11 +6,27 @@ function formatDateInput(date) {
   return date.toISOString().slice(0, 10);
 }
 
+function getDefaultMonthFilters() {
+  const today = new Date();
+  const monthAgo = new Date(today);
+  monthAgo.setDate(today.getDate() - 29);
+  return {
+    startDate: formatDateInput(monthAgo),
+    endDate: formatDateInput(today),
+  };
+}
+
 function formatDateTime(value) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+}
+
+function formatDayLabel(timestamp) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString(undefined, { month: "short", day: "2-digit" });
 }
 
 function parseMeasurementDate(row) {
@@ -24,10 +40,11 @@ function toNumeric(value) {
 
 function buildTimeSeriesBySensor(rows, selectedNodeId) {
   const map = new Map();
-  const normalizedNode = selectedNodeId === "all" ? "all" : Number(selectedNodeId);
+  const normalizedNode = Number(selectedNodeId);
+  if (!Number.isFinite(normalizedNode)) return [];
 
   for (const row of rows) {
-    if (normalizedNode !== "all" && row.node_id !== normalizedNode) continue;
+    if (row.node_id !== normalizedNode) continue;
     const value = toNumeric(row.value);
     if (value === null) continue;
     const rawDate = parseMeasurementDate(row);
@@ -71,6 +88,32 @@ function buildLinePath(points, domains, width = 680, height = 220, padding = 28)
     .join(" ");
 }
 
+function buildAreaPath(points, domains, width = 680, height = 220, padding = 28) {
+  if (!points.length) return "";
+  const { minX, maxX, minY, maxY } = domains;
+  const usableWidth = width - padding * 2;
+  const usableHeight = height - padding * 2;
+  const baselineY = padding + usableHeight;
+
+  const chartPoints = points.map((point) => {
+    const xRatio = maxX === minX ? 0.5 : (point.timestamp - minX) / (maxX - minX);
+    const yRatio = maxY === minY ? 0.5 : (point.value - minY) / (maxY - minY);
+    return {
+      x: padding + xRatio * usableWidth,
+      y: padding + usableHeight - yRatio * usableHeight,
+    };
+  });
+
+  const first = chartPoints[0];
+  const last = chartPoints[chartPoints.length - 1];
+  return [
+    `M${first.x} ${baselineY}`,
+    ...chartPoints.map((p) => `L${p.x} ${p.y}`),
+    `L${last.x} ${baselineY}`,
+    "Z",
+  ].join(" ");
+}
+
 function formatSensorTypeLabel(sensorType) {
   if (!sensorType) return null;
   const unit = sensorType.unit_of_measure ? ` (${sensorType.unit_of_measure})` : "";
@@ -100,27 +143,26 @@ function isLongitudeSensor(sensorType, sensorTypeId) {
 
 export default function HistoricalDashboardPage() {
   const { t } = useThemeLang();
-  const today = new Date();
-  const sevenDaysAgo = new Date(today);
-  sevenDaysAgo.setDate(today.getDate() - 6);
+  const defaultFilters = useMemo(() => getDefaultMonthFilters(), []);
 
-  const [filters, setFilters] = useState({
-    startDate: formatDateInput(sevenDaysAgo),
-    endDate: formatDateInput(today),
-  });
+  const [filters, setFilters] = useState(defaultFilters);
   const [measurements, setMeasurements] = useState([]);
   const [nodes, setNodes] = useState([]);
   const [sensorTypes, setSensorTypes] = useState([]);
-  const [selectedNodeId, setSelectedNodeId] = useState("all");
+  const [selectedNodeId, setSelectedNodeId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function fetchMeasurements(activeFilters = filters) {
+  async function fetchMeasurements(activeFilters = filters, activeNodeId = selectedNodeId) {
     try {
       setLoading(true);
       setError("");
-      const data = await getMeasurementsFiltered(activeFilters);
-      setMeasurements(Array.isArray(data) ? data : []);
+      const response = await getMeasurementsFiltered({
+        ...activeFilters,
+        nodeId: activeNodeId,
+      });
+      const rows = response?.rows;
+      setMeasurements(Array.isArray(rows) ? rows : []);
     } catch (err) {
       setError(err.message || t("Error al cargar los datos"));
       setMeasurements([]);
@@ -128,10 +170,6 @@ export default function HistoricalDashboardPage() {
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    fetchMeasurements();
-  }, []);
 
   useEffect(() => {
     async function fetchSensorTypesData() {
@@ -203,12 +241,22 @@ export default function HistoricalDashboardPage() {
   }, [nodes]);
 
   useEffect(() => {
-    if (selectedNodeId === "all") return;
+    if (!nodeOptions.length) {
+      setSelectedNodeId("");
+      setMeasurements([]);
+      return;
+    }
     const exists = nodeOptions.some((node) => node.value === selectedNodeId);
     if (!exists) {
-      setSelectedNodeId(nodeOptions[0]?.value || "all");
+      const firstNodeId = nodeOptions[0].value;
+      setSelectedNodeId(firstNodeId);
     }
-  }, [nodeOptions, selectedNodeId]);
+  }, [nodeOptions, selectedNodeId, defaultFilters]);
+
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    fetchMeasurements(filters, selectedNodeId);
+  }, [filters.startDate, filters.endDate, selectedNodeId]);
 
   const temporalSeries = useMemo(
     () => buildTimeSeriesBySensor(measurements, selectedNodeId),
@@ -232,15 +280,19 @@ export default function HistoricalDashboardPage() {
       const label = formatSensorTypeLabel(sensorType) || `Sensor ${series.sensorTypeId}`;
       const xs = series.points.map((point) => point.timestamp);
       const ys = series.points.map((point) => point.value);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
       const domains = {
-        minX: Math.min(...xs),
-        maxX: Math.max(...xs),
-        minY: Math.min(...ys),
-        maxY: Math.max(...ys),
+        minX,
+        maxX,
+        minY,
+        maxY,
       };
       const latest = series.points[series.points.length - 1]?.value ?? null;
-      const min = Math.min(...ys);
-      const max = Math.max(...ys);
+      const min = minY;
+      const max = maxY;
       return {
         sensorTypeId: series.sensorTypeId,
         label,
@@ -249,14 +301,18 @@ export default function HistoricalDashboardPage() {
         latest,
         min,
         max,
+        chartId: `sensor-${series.sensorTypeId}`,
+        startLabel: formatDayLabel(minX),
+        endLabel: formatDayLabel(maxX),
+        midLabel: formatDayLabel(minX + (maxX - minX) / 2),
         color: lineColors[index % lineColors.length],
       };
     });
   }, [temporalSeries, sensorTypeMap]);
 
   const selectedNodeMeasurements = useMemo(() => {
-    if (selectedNodeId === "all") return [];
     const nodeId = Number(selectedNodeId);
+    if (!Number.isFinite(nodeId)) return [];
     return measurements.filter((row) => row.node_id === nodeId);
   }, [measurements, selectedNodeId]);
 
@@ -307,15 +363,8 @@ export default function HistoricalDashboardPage() {
       .slice(0, 10);
   }, [measurements]);
 
-  function onApplyFilters(event) {
-    event.preventDefault();
-    fetchMeasurements(filters);
-  }
-
   function onClearFilters() {
-    const cleared = { startDate: "", endDate: "" };
-    setFilters(cleared);
-    fetchMeasurements(cleared);
+    setFilters(defaultFilters);
   }
 
   return (
@@ -323,14 +372,19 @@ export default function HistoricalDashboardPage() {
       <div className="panel-heading-row">
         <div>
           <h2>{t("Dashboard")}</h2>
-          <p>Indicadores de mediciones con filtro por rango de fechas.</p>
+          <p>Evolucion de lecturas del ultimo mes por sensor y por nodo.</p>
         </div>
-        <button className="btn-primary" type="button" onClick={() => fetchMeasurements()} disabled={loading}>
+        <button
+          className="btn-primary"
+          type="button"
+          onClick={() => fetchMeasurements(filters, selectedNodeId)}
+          disabled={loading}
+        >
           {loading ? "Actualizando..." : "Actualizar"}
         </button>
       </div>
 
-      <form className="form-card dashboard-filters" onSubmit={onApplyFilters}>
+      <div className="form-card dashboard-filters">
         <div className="dashboard-filters-grid">
           <label>
             Fecha inicio
@@ -351,7 +405,6 @@ export default function HistoricalDashboardPage() {
           <label>
             Nodo
             <select value={selectedNodeId} onChange={(e) => setSelectedNodeId(e.target.value)}>
-              <option value="all">Todos</option>
               {nodeOptions.map((node) => (
                 <option key={node.value} value={node.value}>
                   {node.label}
@@ -360,15 +413,12 @@ export default function HistoricalDashboardPage() {
             </select>
           </label>
           <div className="dashboard-filter-actions">
-            <button className="btn-primary" type="submit" disabled={loading}>
-              Aplicar filtro
-            </button>
             <button className="btn-outline" type="button" onClick={onClearFilters} disabled={loading}>
               Limpiar
             </button>
           </div>
         </div>
-      </form>
+      </div>
 
       {error && <div className="error-box">{error}</div>}
 
@@ -409,11 +459,31 @@ export default function HistoricalDashboardPage() {
                 <span className="tag">{chart.points.length} puntos</span>
               </div>
               <svg viewBox="0 0 560 180" role="img" aria-label={`Serie temporal de ${chart.label}`} className="trend-chart">
+                <defs>
+                  <linearGradient id={`${chart.chartId}-fill`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={chart.color} stopOpacity="0.3" />
+                    <stop offset="100%" stopColor={chart.color} stopOpacity="0.03" />
+                  </linearGradient>
+                </defs>
+                <line x1="24" y1="24" x2="536" y2="24" className="trend-grid" />
+                <line x1="24" y1="78" x2="536" y2="78" className="trend-grid" />
+                <line x1="24" y1="132" x2="536" y2="132" className="trend-grid" />
+                <line x1="24" y1="156" x2="536" y2="156" className="trend-grid trend-grid-base" />
+                <path d={buildAreaPath(chart.points, chart.domains, 560, 180, 24)} className="trend-area" fill={`url(#${chart.chartId}-fill)`} />
                 <path
                   d={buildLinePath(chart.points, chart.domains, 560, 180, 24)}
                   className="trend-line"
                   style={{ stroke: chart.color }}
                 />
+                <text x="24" y="172" className="trend-label">
+                  {chart.startLabel}
+                </text>
+                <text x="280" y="172" textAnchor="middle" className="trend-label">
+                  {chart.midLabel}
+                </text>
+                <text x="536" y="172" textAnchor="end" className="trend-label">
+                  {chart.endLabel}
+                </text>
               </svg>
               <div className="sensor-mini-stats">
                 <span>Último: {chart.latest !== null ? chart.latest.toFixed(2) : "-"}</span>
@@ -428,10 +498,10 @@ export default function HistoricalDashboardPage() {
       <div className="table-card node-map-card">
         <div className="table-header">
           <h3>Mini mapa del nodo</h3>
-          <span>{selectedNodeId === "all" ? "Seleccione un nodo" : `Nodo ${selectedNodeId}`}</span>
+          <span>{selectedNodeId ? `Nodo ${selectedNodeId}` : "Sin nodos disponibles"}</span>
         </div>
-        {selectedNodeId === "all" ? (
-          <p>Seleccioná un nodo específico para ver su ubicación.</p>
+        {!selectedNodeId ? (
+          <p>No hay nodos disponibles para mostrar ubicación.</p>
         ) : !latestCoordinates ? (
           <p>No hay coordenadas disponibles para el nodo seleccionado.</p>
         ) : (

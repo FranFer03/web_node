@@ -45,7 +45,7 @@ web_node/
 El frontend usa como base URL:
 
 - `VITE_API_BASE_URL` (archivo `.env`)
-- fallback: `https://panel.franfernandez.site`
+- fallback: `https://almacenamiento-api-pf.s4bnsc.easypanel.host`
 
 Plantilla incluida en `.env.example`.
 
