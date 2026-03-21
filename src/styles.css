@@ -166,8 +166,34 @@ input {
 
 .landing-header nav {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.landing-header nav a {
+  text-decoration: none;
+  font-weight: 500;
   color: var(--text-muted);
+  font-size: 0.95rem;
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  position: relative;
+}
+
+.landing-header nav a:hover {
+  color: var(--orange);
+  background: var(--nav-active);
+  border-color: var(--nav-active-border);
+}
+
+.landing-header nav a.active,
+.landing-header nav a.active-section {
+  background: var(--orange);
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.35);
+  transform: translateY(-1px);
 }
 
 .landing-controls {
@@ -436,6 +462,7 @@ input {
   padding: 1rem 0.6rem;
   width: 68px;
   align-items: center;
+  cursor: pointer;
 }
 
 .brand-block {
@@ -451,6 +478,16 @@ input {
 
 .sidebar.collapsed .brand-block {
   justify-content: center;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.sidebar-brand-logo img {
+  width: 140px;
+}
+
+.sidebar-brand-logo--mini img {
+  width: 42px;
 }
 
 .sidebar-collapse-toggle {
@@ -1067,6 +1104,12 @@ input {
 .node-metrics small {
   color: var(--text-muted);
   display: block;
+}
+
+.landing-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
 }
 
 .table-header {

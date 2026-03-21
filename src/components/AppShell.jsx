@@ -82,23 +82,13 @@ export default function AppShell() {
       <aside
         ref={sidebarRef}
         className={`sidebar ${mobileOpen ? "open" : ""} ${collapsed ? "collapsed" : ""}`}
+        onClick={() => collapsed && setCollapsed(false)}
       >
         {/* Brand / Logo block */}
-        <div className="brand-block">
-          {!collapsed && (
-            <div>
-              <BrandLogo className="sidebar-brand-logo" />
-            </div>
-          )}
-          {collapsed && (
-            <button
-              className="sidebar-collapse-toggle"
-              onClick={() => setCollapsed(false)}
-              aria-label="Expand sidebar"
-            >
-              <span className="material-symbols-outlined">menu</span>
-            </button>
-          )}
+        <div className="brand-block" onClick={(e) => e.stopPropagation()}>
+          <Link to="/" aria-label="Volver al inicio" className="sidebar-logo-link">
+            <BrandLogo className={collapsed ? "sidebar-brand-logo--mini" : "sidebar-brand-logo"} />
+          </Link>
           {!collapsed && (
             <button
               className="sidebar-collapse-toggle sidebar-collapse-toggle--close"

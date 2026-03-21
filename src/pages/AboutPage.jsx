@@ -1,12 +1,14 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 import BrandLogo from "../components/BrandLogo";
+import { getAuthState } from "../lib/auth";
 import personaje1 from "../../assets/integrantes/personaje1.jpg";
 import personaje2 from "../../assets/integrantes/personaje2.jpg";
 
 export default function AboutPage() {
   const navigate = useNavigate();
   const { t, theme, toggleTheme, language, changeLanguage } = useThemeLang();
+  const { isAuthenticated } = getAuthState();
   const toggleLanguage = () => changeLanguage(language === "es" ? "en" : "es");
 
   return (
@@ -18,9 +20,9 @@ export default function AboutPage() {
           </Link>
         </div>
         <nav>
-          <Link to="/">Proyecto</Link>
-          <Link to="/download">Descargas</Link>
-          <Link to="/about" className="active-nav">Nosotros</Link>
+          <NavLink to="/" end>{t("Proyecto")}</NavLink>
+          <NavLink to="/download">{t("Descargas")}</NavLink>
+          <NavLink to="/about">{t("Nosotros")}</NavLink>
         </nav>
         <div className="landing-controls">
           <button
@@ -37,27 +39,29 @@ export default function AboutPage() {
             <span className={language === "es" ? "active" : ""}>ES</span>
             <span className={language === "en" ? "active" : ""}>EN</span>
           </button>
-          <button className="btn-outline" onClick={() => navigate("/login")}>Ingresar</button>
+          <button className="btn-outline" onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}>
+            {isAuthenticated ? "Dashboard" : t("Ingresar")}
+          </button>
         </div>
       </header>
 
       <main className="about-page-content">
         <section className="about-section" id="nosotros">
-          <h2>Nosotros</h2>
-          <p className="about-subtitle">Desarrolladores del proyecto Final de Ingeniería Electrónica</p>
+          <h2>{t("Nosotros")}</h2>
+          <p className="about-subtitle">{t("Desarrolladores del proyecto Final de Ingeniería Electrónica")}</p>
           <div className="about-grid">
             <article className="about-card">
               <img src={personaje1} alt="Integrante 1" className="about-photo" />
               <div className="about-info">
-                <h3>Integrante 1</h3>
-                <p>Desarrollador y diseñador del sistema de telemetría LoRa Mesh. Enfocado en el hardware y la arquitectura de la red.</p>
+                <h3>{t("Integrante 1")}</h3>
+                <p>{t("Desarrollador y diseñador del sistema de telemetría LoRa Mesh. Enfocado en el hardware y la arquitectura de la red.")}</p>
               </div>
             </article>
             <article className="about-card">
               <img src={personaje2} alt="Integrante 2" className="about-photo" />
               <div className="about-info">
-                <h3>Integrante 2</h3>
-                <p>Especialista en desarrollo web y despliegue del software. Encargado de la visualización y análisis de datos en tiempo real.</p>
+                <h3>{t("Integrante 2")}</h3>
+                <p>{t("Especialista en desarrollo web y despliegue del software. Encargado de la visualización y análisis de datos en tiempo real.")}</p>
               </div>
             </article>
           </div>
@@ -65,11 +69,11 @@ export default function AboutPage() {
       </main>
 
       <footer className="landing-footer">
-        <span>LoRa Mesh Monitor - Red Mesh para monitoreo remoto</span>
+        <span>LoRa Mesh Monitor - {t("Red de sensores inalámbricos")}</span>
         <div>
-          <Link to="/">Proyecto</Link>
-          <Link to="/about">Nosotros</Link>
-          <Link to="/download">Descargas</Link>
+          <Link to="/">{t("Proyecto")}</Link>
+          <Link to="/about">{t("Nosotros")}</Link>
+          <Link to="/download">{t("Descargas")}</Link>
         </div>
       </footer>
     </div>
