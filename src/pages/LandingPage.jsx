@@ -37,7 +37,7 @@ export default function LandingPage() {
             <span className={language === "es" ? "active" : ""}>ES</span>
             <span className={language === "en" ? "active" : ""}>EN</span>
           </button>
-          <button className="btn-outline" onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}>
+          <button className="btn-outline" onClick={() => navigate(getAuthState().isAuthenticated ? "/dashboard" : "/login")}>
             {isAuthenticated ? "Dashboard" : t("Ingresar")}
           </button>
         </div>
@@ -55,7 +55,7 @@ export default function LandingPage() {
             {t("Plataforma orientada a zonas remotas que combina bajo consumo, alcance extendido y comunicacion multisalto para transportar lecturas ambientales hacia un nodo concentrador.")}
           </p>
           <div className="hero-actions">
-            <button className="btn-primary" onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}>
+            <button className="btn-primary" onClick={() => navigate(getAuthState().isAuthenticated ? "/dashboard" : "/login")}>
               {isAuthenticated ? "Dashboard" : t("Ver panel")}
             </button>
             <button className="btn-muted">{t("Resumen tecnico")}</button>
@@ -108,7 +108,7 @@ export default function LandingPage() {
           {t("Agricultura de precision, monitoreo ambiental, energias renovables e iniciativas academicas que requieren telemetria confiable en zonas remotas.")}
         </p>
         <div className="cta-row">
-          <button className="btn-primary" onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}>
+          <button className="btn-primary" onClick={() => navigate(getAuthState().isAuthenticated ? "/dashboard" : "/login")}>
             {isAuthenticated ? "Dashboard" : t("Ir al sistema")}
           </button>
         </div>

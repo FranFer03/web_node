@@ -37,7 +37,7 @@ export default function DownloadPage() {
             <span className={language === "es" ? "active" : ""}>ES</span>
             <span className={language === "en" ? "active" : ""}>EN</span>
           </button>
-          <button className="btn-outline" onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}>
+          <button className="btn-outline" onClick={() => navigate(getAuthState().isAuthenticated ? "/dashboard" : "/login")}>
             {isAuthenticated ? "Dashboard" : t("Ingresar")}
           </button>
         </div>

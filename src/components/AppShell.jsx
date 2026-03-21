@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { clearAuthState, getAuthState, resolveAvatarUrl } from "../lib/auth";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 import BrandLogo from "./BrandLogo";
