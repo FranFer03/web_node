@@ -1,5 +1,7 @@
 const AUTH_KEY = "lora_auth";
 const USER_KEY = "lora_user";
+const EXPIRATION_KEY = "lora_auth_expiry";
+const DAYS_TO_PERSIST = 7; // Session lasts 7 days
 
 export function resolveAvatarUrl(source) {
   if (!source) return null;
@@ -40,6 +42,12 @@ export function resolveAvatarUrl(source) {
 }
 
 export function getAuthState() {
+  const expiry = localStorage.getItem(EXPIRATION_KEY);
+  if (expiry && Date.now() > parseInt(expiry)) {
+    clearAuthState();
+    return { isAuthenticated: false, token: null, user: null };
+  }
+
   const token = localStorage.getItem(AUTH_KEY);
   const userRaw = localStorage.getItem(USER_KEY);
   const parsedUser = userRaw ? JSON.parse(userRaw) : null;
@@ -67,11 +75,15 @@ export function setAuthState(loginData) {
     avatarUrl,
   };
 
+  const expiry = Date.now() + DAYS_TO_PERSIST * 24 * 60 * 60 * 1000;
+
   localStorage.setItem(AUTH_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem(EXPIRATION_KEY, expiry.toString());
 }
 
 export function clearAuthState() {
   localStorage.removeItem(AUTH_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(EXPIRATION_KEY);
 }

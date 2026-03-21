@@ -7,6 +7,8 @@ import LoginPage from "./pages/LoginPage";
 import NodesManagerPage from "./pages/NodesManagerPage";
 import NodesVisualizerPage from "./pages/NodesVisualizerPage";
 import PacketLogsPage from "./pages/PacketLogsPage";
+import AboutPage from "./pages/AboutPage";
+import DownloadPage from "./pages/DownloadPage";
 import { ThemeLangProvider } from "./contexts/ThemeLangContext";
 
 export default function App() {
@@ -14,6 +16,8 @@ export default function App() {
     <ThemeLangProvider>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/download" element={<DownloadPage />} />
         <Route path="/login" element={<LoginPage />} />
 
         <Route element={<ProtectedRoute />}>

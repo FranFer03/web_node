@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { loginUser } from "../lib/api";
 import { setAuthState } from "../lib/auth";
 import { useThemeLang } from "../contexts/ThemeLangContext";
@@ -41,7 +41,9 @@ export default function LoginPage() {
     <div className="login-page">
       <header className="login-header">
         <div className="landing-brand">
-          <BrandLogo className="landing-brand-logo" />
+          <Link to="/" aria-label="Inicio">
+            <BrandLogo className="landing-brand-logo" />
+          </Link>
           <strong>LoRa Mesh Monitor</strong>
         </div>
         <div className="landing-controls">

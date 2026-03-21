@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 import BrandLogo from "../components/BrandLogo";
 
@@ -11,14 +11,14 @@ export default function LandingPage() {
     <div className="landing-page">
       <header className="landing-header">
         <div className="landing-brand">
-          <BrandLogo className="landing-brand-logo" />
-          <strong>LoRa Mesh Monitor</strong>
+          <Link to="/" aria-label="Inicio">
+            <BrandLogo className="landing-brand-logo" />
+          </Link>
         </div>
         <nav>
           <a href="#presentacion">Proyecto</a>
-          <a href="#objetivos">Objetivos</a>
-          <a href="#red">Red LoRa Mesh</a>
-          <a href="#aplicaciones">Aplicaciones</a>
+          <Link to="/download">Descargas</Link>
+          <Link to="/about">Nosotros</Link>
         </nav>
         <div className="landing-controls">
           <button
@@ -114,9 +114,8 @@ export default function LandingPage() {
         <span>LoRa Mesh Monitor - Red Mesh para monitoreo remoto</span>
         <div>
           <a href="#presentacion">Proyecto</a>
-          <a href="#objetivos">Objetivos</a>
-          <a href="#red">Arquitectura</a>
-          <a href="#aplicaciones">Aplicaciones</a>
+          <Link to="/about">Nosotros</Link>
+          <Link to="/download">Descargas</Link>
         </div>
       </footer>
     </div>
