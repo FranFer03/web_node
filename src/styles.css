@@ -436,10 +436,11 @@ input {
 }
 
 .app-layout {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-columns: 290px 1fr;
   transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .app-layout.sidebar-collapsed {
@@ -718,6 +719,8 @@ input {
   min-width: 0;
   display: grid;
   grid-template-rows: auto 1fr;
+  overflow-y: auto;
+  height: 100vh;
 }
 
 .topbar {
