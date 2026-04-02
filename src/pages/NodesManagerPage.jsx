@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createDeviceNode,
   getDeviceNodes,
@@ -9,35 +9,21 @@ import { useThemeLang } from "../contexts/ThemeLangContext";
 
 export default function NodesManagerPage() {
   const { t } = useThemeLang();
-  
+  const formRef = useRef(null);
+
   const [nodes, setNodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [form, setForm] = useState({ model: "", refresh_rate: 30 });
   const [saving, setSaving] = useState(false);
   const [editingNodeId, setEditingNodeId] = useState(null);
   const [nodeToDelete, setNodeToDelete] = useState(null);
+  const [nodeToToggle, setNodeToToggle] = useState(null);
 
-  async function handleDeleteConfirm() {
-    if (!nodeToDelete) return;
-    try {
-      await deleteDeviceNode(nodeToDelete.node_id);
-      setNodeToDelete(null);
-      await loadNodes();
-    } catch (err) {
-      setError(err.message || t("Error al cargar los datos"));
-    }
-  }
-
-  function handleEditClick(node) {
-    setEditingNodeId(node.node_id);
-    setForm({ model: node.model, refresh_rate: node.refresh_rate });
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-  }
-
-  function handleCancelEdit() {
-    setEditingNodeId(null);
-    setForm({ model: "", refresh_rate: 30 });
+  function showSuccess(msg) {
+    setSuccess(msg);
+    setTimeout(() => setSuccess(""), 3000);
   }
 
   async function loadNodes() {
@@ -57,6 +43,48 @@ export default function NodesManagerPage() {
     loadNodes();
   }, []);
 
+  async function handleDeleteConfirm() {
+    if (!nodeToDelete) return;
+    try {
+      await deleteDeviceNode(nodeToDelete.node_id);
+      setNodeToDelete(null);
+      await loadNodes();
+      showSuccess(t("Nodo eliminado correctamente."));
+    } catch (err) {
+      setError(err.message || t("Error al cargar los datos"));
+      setNodeToDelete(null);
+    }
+  }
+
+  async function handleToggleConfirm() {
+    if (!nodeToToggle) return;
+    const newStatus = nodeToToggle.status === "active" ? "inactive" : "active";
+    try {
+      await updateDeviceNode(nodeToToggle.node_id, { status: newStatus });
+      setNodeToToggle(null);
+      await loadNodes();
+      showSuccess(
+        newStatus === "active"
+          ? t("Nodo activado correctamente.")
+          : t("Nodo desactivado correctamente.")
+      );
+    } catch (err) {
+      setError(err.message || t("Error al cargar los datos"));
+      setNodeToToggle(null);
+    }
+  }
+
+  function handleEditClick(node) {
+    setEditingNodeId(node.node_id);
+    setForm({ model: node.model, refresh_rate: node.refresh_rate });
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
+  function handleCancelEdit() {
+    setEditingNodeId(null);
+    setForm({ model: "", refresh_rate: 30 });
+  }
+
   async function handleSubmitNode(event) {
     event.preventDefault();
     setSaving(true);
@@ -68,38 +96,22 @@ export default function NodesManagerPage() {
           model: form.model,
           refresh_rate: Number(form.refresh_rate),
         });
+        showSuccess(t("Nodo actualizado correctamente."));
       } else {
         await createDeviceNode({
           model: form.model,
           refresh_rate: Number(form.refresh_rate),
           status: "active",
         });
+        showSuccess(t("Nodo creado correctamente."));
       }
       setEditingNodeId(null);
       setForm({ model: "", refresh_rate: 30 });
       await loadNodes();
     } catch (err) {
-      setError(
-        err.message ||
-          (editingNodeId ? t("Error al cargar los datos") : t("Error al cargar los datos"))
-      );
+      setError(err.message || t("Error al cargar los datos"));
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function toggleNode(node) {
-    const action = node.status === "active" ? t("Desactivar") : t("Activar");
-    if (!window.confirm(`${t("Confirmar Eliminación")} - ${action} ${node.node_id}?`)) {
-      return;
-    }
-
-    const status = node.status === "active" ? "inactive" : "active";
-    try {
-      await updateDeviceNode(node.node_id, { status });
-      await loadNodes();
-    } catch (err) {
-      setError(err.message || t("Error al cargar los datos"));
     }
   }
 
@@ -112,16 +124,23 @@ export default function NodesManagerPage() {
         </div>
       </div>
 
+      {error && <div className="error-box">{error}</div>}
+      {success && <div className="success-box">{success}</div>}
+
       <div className="table-card">
         <div className="table-header">
           <h3>{t("Active Network Nodes")}</h3>
-          <span>{nodes.length} {t("nodos")}</span>
+          <span>
+            {nodes.length} {t("nodos")}
+          </span>
         </div>
 
-        {loading ? <p>{t("Cargando nodos...")}</p> : null}
-        {error ? <p className="error-box">{error}</p> : null}
-
-        {!loading && nodes.length > 0 ? (
+        {loading ? (
+          <div className="analytics-card">
+            <span className="material-symbols-outlined">data_usage</span>
+            <p>{t("Cargando nodos...")}</p>
+          </div>
+        ) : nodes.length > 0 ? (
           <table>
             <thead>
               <tr>
@@ -139,35 +158,27 @@ export default function NodesManagerPage() {
                   <td>{node.model}</td>
                   <td>{node.refresh_rate}s</td>
                   <td>
-                    <span
-                      className={`status-pill ${
-                        node.status === "active" ? "ok" : "off"
-                      }`}
-                    >
+                    <span className={`status-pill ${node.status === "active" ? "ok" : "off"}`}>
                       {node.status === "active" ? t("Active") : t("Offline")}
                     </span>
                   </td>
-                  <td>
-                    <button
-                      className="btn-muted"
-                      onClick={() => handleEditClick(node)}
-                      style={{ marginRight: "8px" }}
-                    >
+                  <td className="table-actions">
+                    <button className="btn-muted" onClick={() => handleEditClick(node)}>
                       {t("Editar")}
                     </button>
                     <button
                       className="btn-muted"
+                      style={{ color: "var(--red)" }}
                       onClick={() => setNodeToDelete(node)}
-                      style={{ marginRight: "8px", color: "var(--red)" }}
                     >
                       {t("Eliminar")}
                     </button>
                     <button
                       className="btn-muted"
-                      onClick={() => toggleNode(node)}
                       style={{
                         color: node.status === "active" ? "var(--red)" : "var(--green)",
                       }}
+                      onClick={() => setNodeToToggle(node)}
                     >
                       {node.status === "active" ? t("Desactivar") : t("Activar")}
                     </button>
@@ -176,10 +187,12 @@ export default function NodesManagerPage() {
               ))}
             </tbody>
           </table>
-        ) : null}
+        ) : (
+          <p>{t("No hay nodos disponibles.")}</p>
+        )}
       </div>
 
-      <form className="form-card" onSubmit={handleSubmitNode}>
+      <form ref={formRef} className="form-card" onSubmit={handleSubmitNode}>
         <h3>{editingNodeId ? t("Edit Node Configuration") : t("Provision New Node")}</h3>
         <label>
           {t("Node Model")}
@@ -203,7 +216,7 @@ export default function NodesManagerPage() {
           />
         </label>
 
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div className="form-actions">
           <button className="btn-primary" type="submit" disabled={saving}>
             {saving
               ? editingNodeId
@@ -214,48 +227,24 @@ export default function NodesManagerPage() {
               : t("Deploy Node to Mesh")}
           </button>
           {editingNodeId && (
-            <button
-              type="button"
-              className="btn-muted"
-              onClick={handleCancelEdit}
-              disabled={saving}
-            >
+            <button type="button" className="btn-muted" onClick={handleCancelEdit} disabled={saving}>
               {t("Cancel")}
             </button>
           )}
         </div>
       </form>
 
+      {/* Delete confirmation modal */}
       {nodeToDelete && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            className="form-card"
-            style={{
-              background: "var(--panel)",
-              width: "400px",
-              maxWidth: "90%",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-            }}
-          >
+        <div className="modal-backdrop" onClick={() => setNodeToDelete(null)}>
+          <div className="modal-dialog form-card" onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: 0, color: "var(--red)" }}>{t("Confirmar Eliminación")}</h3>
-            <p style={{ marginTop: "0.5rem", color: "var(--text)" }}>
-              {t("Confirmar Eliminación")}{" "}
-              <strong>{nodeToDelete.model}</strong> (ID: {nodeToDelete.node_id})?
+            <p style={{ marginTop: "0.5rem" }}>
+              {t("¿Eliminar el nodo")}{" "}
+              <strong>{nodeToDelete.model}</strong> (ID: {nodeToDelete.node_id})?{" "}
+              {t("Esta accion no se puede deshacer.")}
             </p>
-            <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
+            <div className="form-actions" style={{ marginTop: "1rem" }}>
               <button
                 className="btn-primary"
                 style={{ background: "var(--red)", flex: 1 }}
@@ -263,11 +252,40 @@ export default function NodesManagerPage() {
               >
                 {t("Sí, Eliminar")}
               </button>
+              <button className="btn-muted" style={{ flex: 1 }} onClick={() => setNodeToDelete(null)}>
+                {t("Cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toggle confirmation modal */}
+      {nodeToToggle && (
+        <div className="modal-backdrop" onClick={() => setNodeToToggle(null)}>
+          <div className="modal-dialog form-card" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: 0 }}>
+              {nodeToToggle.status === "active" ? t("Desactivar nodo") : t("Activar nodo")}
+            </h3>
+            <p style={{ marginTop: "0.5rem" }}>
+              {nodeToToggle.status === "active"
+                ? t("¿Desactivar el nodo")
+                : t("¿Activar el nodo")}{" "}
+              <strong>{nodeToToggle.model}</strong> (ID: {nodeToToggle.node_id})?
+            </p>
+            <div className="form-actions" style={{ marginTop: "1rem" }}>
               <button
-                className="btn-muted"
-                style={{ flex: 1 }}
-                onClick={() => setNodeToDelete(null)}
+                className="btn-primary"
+                style={{
+                  background:
+                    nodeToToggle.status === "active" ? "var(--red)" : "var(--green)",
+                  flex: 1,
+                }}
+                onClick={handleToggleConfirm}
               >
+                {nodeToToggle.status === "active" ? t("Sí, Desactivar") : t("Sí, Activar")}
+              </button>
+              <button className="btn-muted" style={{ flex: 1 }} onClick={() => setNodeToToggle(null)}>
                 {t("Cancel")}
               </button>
             </div>

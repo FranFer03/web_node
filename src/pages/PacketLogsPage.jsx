@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useThemeLang } from "../contexts/ThemeLangContext";
+import { useWsStatus } from "../contexts/WsStatusContext";
+import { getAuthState } from "../lib/auth";
 import { API_BASE_URL } from "../lib/api";
 
 const LEVEL_COLORS = {
@@ -10,16 +12,18 @@ const LEVEL_COLORS = {
   CRITICAL: "#a855f7",
 };
 
-const WS_URL =
+const WS_BASE =
   API_BASE_URL.replace(/^https/, "wss")
     .replace(/^http(?!s)/, "ws")
-    .replace(/\/$/, "") + "/ws/logs";
+    .replace(/\/$/, "");
 
 const MAX_LOGS = 300;
-const RECONNECT_DELAY = 3000;
+const MAX_RECONNECTS = 10;
+const BASE_DELAY_MS = 3000;
 
 export default function PacketLogsPage() {
   const { t } = useThemeLang();
+  const { setStatus: setGlobalStatus } = useWsStatus();
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState("connecting");
   const [filterLevel, setFilterLevel] = useState("ALL");
@@ -28,6 +32,15 @@ export default function PacketLogsPage() {
   const reconnectTimer = useRef(null);
   const logEndRef = useRef(null);
   const reconnectCount = useRef(0);
+  const isMounted = useRef(true);
+
+  const updateStatus = useCallback(
+    (s) => {
+      setStatus(s);
+      setGlobalStatus(s);
+    },
+    [setGlobalStatus]
+  );
 
   const addLogs = useCallback((newLogs) => {
     setLogs((prev) => {
@@ -37,18 +50,28 @@ export default function PacketLogsPage() {
   }, []);
 
   const connect = useCallback(() => {
+    if (!isMounted.current) return;
     if (wsRef.current && wsRef.current.readyState < 2) return;
 
-    setStatus("connecting");
-    const ws = new WebSocket(WS_URL);
+    const { token } = getAuthState();
+    if (!token || token === "session") {
+      updateStatus("disconnected");
+      return;
+    }
+
+    updateStatus("connecting");
+    const url = `${WS_BASE}/ws/logs?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      setStatus("connected");
+      if (!isMounted.current) return;
+      updateStatus("connected");
       reconnectCount.current = 0;
     };
 
     ws.onmessage = (event) => {
+      if (!isMounted.current) return;
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === "log_history") {
@@ -58,10 +81,7 @@ export default function PacketLogsPage() {
           }));
           setLogs(history.slice(-MAX_LOGS));
         } else if (msg.type === "new_log") {
-          const log = {
-            ...msg.data,
-            _key: `n-${msg.data.log_id}-${Date.now()}`,
-          };
+          const log = { ...msg.data, _key: `n-${msg.data.log_id}-${Date.now()}` };
           addLogs([log]);
         }
       } catch {
@@ -70,25 +90,29 @@ export default function PacketLogsPage() {
     };
 
     ws.onclose = () => {
-      setStatus("disconnected");
+      if (!isMounted.current) return;
+      updateStatus("disconnected");
+      if (reconnectCount.current >= MAX_RECONNECTS) return;
+      const delay = Math.min(BASE_DELAY_MS * 2 ** reconnectCount.current, 30000);
       reconnectTimer.current = setTimeout(() => {
         reconnectCount.current += 1;
         connect();
-      }, RECONNECT_DELAY);
+      }, delay);
     };
 
-    ws.onerror = () => {
-      ws.close();
-    };
-  }, [addLogs]);
+    ws.onerror = () => ws.close();
+  }, [addLogs, updateStatus]);
 
   useEffect(() => {
+    isMounted.current = true;
     connect();
     return () => {
+      isMounted.current = false;
       clearTimeout(reconnectTimer.current);
       if (wsRef.current) wsRef.current.close();
+      setGlobalStatus("disconnected");
     };
-  }, [connect]);
+  }, [connect, setGlobalStatus]);
 
   useEffect(() => {
     if (autoScroll && logEndRef.current) {
@@ -111,6 +135,12 @@ export default function PacketLogsPage() {
     disconnected: t("Desconectado"),
   }[status];
 
+  const reconnectManually = () => {
+    reconnectCount.current = 0;
+    clearTimeout(reconnectTimer.current);
+    connect();
+  };
+
   return (
     <div className="panel-page">
       <div className="panel-heading-row">
@@ -120,10 +150,15 @@ export default function PacketLogsPage() {
         </div>
         <div className="ws-status-badge">
           <span
-            className="ws-status-dot"
-            style={{ background: statusColor }}
+            className={`ws-status-dot${status === "connecting" ? " connecting" : ""}`}
+            style={{ background: statusColor, color: statusColor }}
           />
           <span>{statusLabel}</span>
+          {status === "disconnected" && reconnectCount.current >= MAX_RECONNECTS && (
+            <button className="btn-muted log-clear-btn" onClick={reconnectManually}>
+              {t("Reconectar")}
+            </button>
+          )}
         </div>
       </div>
 
@@ -133,13 +168,11 @@ export default function PacketLogsPage() {
           value={filterLevel}
           onChange={(e) => setFilterLevel(e.target.value)}
         >
-          {["ALL", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"].map(
-            (lvl) => (
-              <option key={lvl} value={lvl}>
-                {lvl}
-              </option>
-            )
-          )}
+          {["ALL", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"].map((lvl) => (
+            <option key={lvl} value={lvl}>
+              {lvl}
+            </option>
+          ))}
         </select>
 
         <label className="log-autoscroll-label">
@@ -151,10 +184,7 @@ export default function PacketLogsPage() {
           {t("Auto-scroll")}
         </label>
 
-        <button
-          className="btn-muted log-clear-btn"
-          onClick={() => setLogs([])}
-        >
+        <button className="btn-muted log-clear-btn" onClick={() => setLogs([])}>
           <span className="material-symbols-outlined">delete_sweep</span>
           {t("Limpiar")}
         </button>

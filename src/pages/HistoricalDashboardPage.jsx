@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getDeviceNodes, getMeasurementsFiltered, getSensorTypes } from "../lib/api";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 
@@ -180,7 +180,6 @@ export default function HistoricalDashboardPage() {
         setSensorTypes([]);
       }
     }
-
     fetchSensorTypesData();
   }, []);
 
@@ -193,7 +192,6 @@ export default function HistoricalDashboardPage() {
         setNodes([]);
       }
     }
-
     fetchNodesData();
   }, []);
 
@@ -236,9 +234,11 @@ export default function HistoricalDashboardPage() {
       .sort((a, b) => a.node_id - b.node_id)
       .map((node) => ({
         value: String(node.node_id),
-        label: node.model ? `Nodo ${node.node_id} - ${node.model}` : `Nodo ${node.node_id}`,
+        label: node.model
+          ? `${t("Nodo")} ${node.node_id} - ${node.model}`
+          : `${t("Nodo")} ${node.node_id}`,
       }));
-  }, [nodes]);
+  }, [nodes, t]);
 
   useEffect(() => {
     if (!nodeOptions.length) {
@@ -264,14 +264,8 @@ export default function HistoricalDashboardPage() {
   );
 
   const lineColors = [
-    "#f97316",
-    "#0ea5e9",
-    "#22c55e",
-    "#eab308",
-    "#ef4444",
-    "#a855f7",
-    "#14b8a6",
-    "#f43f5e",
+    "#f97316", "#0ea5e9", "#22c55e", "#eab308",
+    "#ef4444", "#a855f7", "#14b8a6", "#f43f5e",
   ];
 
   const perSensorCharts = useMemo(() => {
@@ -284,23 +278,16 @@ export default function HistoricalDashboardPage() {
       const maxX = Math.max(...xs);
       const minY = Math.min(...ys);
       const maxY = Math.max(...ys);
-      const domains = {
-        minX,
-        maxX,
-        minY,
-        maxY,
-      };
+      const domains = { minX, maxX, minY, maxY };
       const latest = series.points[series.points.length - 1]?.value ?? null;
-      const min = minY;
-      const max = maxY;
       return {
         sensorTypeId: series.sensorTypeId,
         label,
         points: series.points,
         domains,
         latest,
-        min,
-        max,
+        min: minY,
+        max: maxY,
         chartId: `sensor-${series.sensorTypeId}`,
         startLabel: formatDayLabel(minX),
         endLabel: formatDayLabel(maxX),
@@ -332,11 +319,7 @@ export default function HistoricalDashboardPage() {
       }
     }
 
-    let lat = null;
-    let lng = null;
-    let latestLatTs = -1;
-    let latestLngTs = -1;
-
+    let lat = null, lng = null, latestLatTs = -1, latestLngTs = -1;
     for (const [sensorTypeId, point] of latestBySensor.entries()) {
       const sensorType = sensorTypeMap.get(sensorTypeId);
       if (isLatitudeSensor(sensorType, sensorTypeId) && point.timestamp > latestLatTs) {
@@ -372,7 +355,7 @@ export default function HistoricalDashboardPage() {
       <div className="panel-heading-row">
         <div>
           <h2>{t("Dashboard")}</h2>
-          <p>Evolucion de lecturas del ultimo mes por sensor y por nodo.</p>
+          <p>{t("Evolucion de lecturas del ultimo mes por sensor y por nodo.")}</p>
         </div>
         <button
           className="btn-primary"
@@ -380,31 +363,37 @@ export default function HistoricalDashboardPage() {
           onClick={() => fetchMeasurements(filters, selectedNodeId)}
           disabled={loading}
         >
-          {loading ? "Actualizando..." : "Actualizar"}
+          {loading ? t("Actualizando...") : t("Actualizar")}
         </button>
       </div>
 
       <div className="form-card dashboard-filters">
         <div className="dashboard-filters-grid">
-          <label>
-            Fecha inicio
+          <label htmlFor="filter-start">
+            {t("Fecha inicio")}
             <input
+              id="filter-start"
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
             />
           </label>
-          <label>
-            Fecha fin
+          <label htmlFor="filter-end">
+            {t("Fecha fin")}
             <input
+              id="filter-end"
               type="date"
               value={filters.endDate}
               onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
             />
           </label>
-          <label>
-            Nodo
-            <select value={selectedNodeId} onChange={(e) => setSelectedNodeId(e.target.value)}>
+          <label htmlFor="filter-node">
+            {t("Nodo")}
+            <select
+              id="filter-node"
+              value={selectedNodeId}
+              onChange={(e) => setSelectedNodeId(e.target.value)}
+            >
               {nodeOptions.map((node) => (
                 <option key={node.value} value={node.value}>
                   {node.label}
@@ -414,7 +403,7 @@ export default function HistoricalDashboardPage() {
           </label>
           <div className="dashboard-filter-actions">
             <button className="btn-outline" type="button" onClick={onClearFilters} disabled={loading}>
-              Limpiar
+              {t("Limpiar")}
             </button>
           </div>
         </div>
@@ -424,23 +413,23 @@ export default function HistoricalDashboardPage() {
 
       <div className="stats-row dashboard-stats">
         <article>
-          <small>Mediciones</small>
+          <small>{t("Mediciones")}</small>
           <strong>{stats.total}</strong>
         </article>
         <article>
-          <small>Nodos registrados</small>
+          <small>{t("Nodos registrados")}</small>
           <strong>{stats.uniqueNodes}</strong>
         </article>
         <article>
-          <small>Tipos de sensor</small>
+          <small>{t("Tipos de sensor")}</small>
           <strong>{stats.uniqueSensorTypes}</strong>
         </article>
         <article>
-          <small>Valor promedio</small>
+          <small>{t("Valor promedio")}</small>
           <strong>{stats.avgValue !== null ? stats.avgValue.toFixed(2) : "-"}</strong>
         </article>
         <article>
-          <small>Ultima medicion</small>
+          <small>{t("Ultima medicion")}</small>
           <strong>{formatDateTime(stats.latest)}</strong>
         </article>
       </div>
@@ -448,17 +437,24 @@ export default function HistoricalDashboardPage() {
       <div className="dashboard-sensors-grid">
         {!loading && perSensorCharts.length === 0 ? (
           <div className="analytics-card dashboard-chart-card">
-            <h3>Series por sensor</h3>
-            <p>No hay datos del nodo seleccionado para el rango indicado.</p>
+            <h3>{t("Series por sensor")}</h3>
+            <p>{t("No hay datos del nodo seleccionado para el rango indicado.")}</p>
           </div>
         ) : (
           perSensorCharts.map((chart) => (
             <article key={chart.sensorTypeId} className="table-card sensor-chart-card">
               <div className="sensor-chart-head">
                 <h3>{chart.label}</h3>
-                <span className="tag">{chart.points.length} puntos</span>
+                <span className="tag">
+                  {chart.points.length} {t("puntos")}
+                </span>
               </div>
-              <svg viewBox="0 0 560 180" role="img" aria-label={`Serie temporal de ${chart.label}`} className="trend-chart">
+              <svg
+                viewBox="0 0 560 180"
+                role="img"
+                aria-label={`${t("Serie temporal de")} ${chart.label}`}
+                className="trend-chart"
+              >
                 <defs>
                   <linearGradient id={`${chart.chartId}-fill`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={chart.color} stopOpacity="0.3" />
@@ -469,7 +465,11 @@ export default function HistoricalDashboardPage() {
                 <line x1="24" y1="78" x2="536" y2="78" className="trend-grid" />
                 <line x1="24" y1="132" x2="536" y2="132" className="trend-grid" />
                 <line x1="24" y1="156" x2="536" y2="156" className="trend-grid trend-grid-base" />
-                <path d={buildAreaPath(chart.points, chart.domains, 560, 180, 24)} className="trend-area" fill={`url(#${chart.chartId}-fill)`} />
+                <path
+                  d={buildAreaPath(chart.points, chart.domains, 560, 180, 24)}
+                  className="trend-area"
+                  fill={`url(#${chart.chartId}-fill)`}
+                />
                 <path
                   d={buildLinePath(chart.points, chart.domains, 560, 180, 24)}
                   className="trend-line"
@@ -486,9 +486,9 @@ export default function HistoricalDashboardPage() {
                 </text>
               </svg>
               <div className="sensor-mini-stats">
-                <span>Último: {chart.latest !== null ? chart.latest.toFixed(2) : "-"}</span>
-                <span>Mín: {chart.min.toFixed(2)}</span>
-                <span>Máx: {chart.max.toFixed(2)}</span>
+                <span>{t("Ultimo")}: {chart.latest !== null ? chart.latest.toFixed(2) : "-"}</span>
+                <span>{t("Min")}: {chart.min.toFixed(2)}</span>
+                <span>{t("Max")}: {chart.max.toFixed(2)}</span>
               </div>
             </article>
           ))
@@ -497,16 +497,18 @@ export default function HistoricalDashboardPage() {
 
       <div className="table-card node-map-card">
         <div className="table-header">
-          <h3>Mini mapa del nodo</h3>
-          <span>{selectedNodeId ? `Nodo ${selectedNodeId}` : "Sin nodos disponibles"}</span>
+          <h3>{t("Mini mapa del nodo")}</h3>
+          <span>
+            {selectedNodeId ? `${t("Nodo")} ${selectedNodeId}` : t("Sin nodos disponibles")}
+          </span>
         </div>
         {!selectedNodeId ? (
-          <p>No hay nodos disponibles para mostrar ubicación.</p>
+          <p>{t("No hay nodos disponibles para mostrar ubicacion.")}</p>
         ) : !latestCoordinates ? (
-          <p>No hay coordenadas disponibles para el nodo seleccionado.</p>
+          <p>{t("No hay coordenadas disponibles para el nodo seleccionado.")}</p>
         ) : (
           <iframe
-            title={`Mapa del nodo ${selectedNodeId}`}
+            title={`${t("Mapa del nodo")} ${selectedNodeId}`}
             className="node-map-frame"
             src={`https://www.openstreetmap.org/export/embed.html?bbox=${latestCoordinates.lng - 0.008},${latestCoordinates.lat - 0.008},${latestCoordinates.lng + 0.008},${latestCoordinates.lat + 0.008}&layer=mapnik&marker=${latestCoordinates.lat},${latestCoordinates.lng}`}
           />
@@ -515,29 +517,31 @@ export default function HistoricalDashboardPage() {
 
       <div className="table-card">
         <div className="table-header">
-          <h3>Ultimas mediciones</h3>
-          <span>{recentMeasurements.length} registros</span>
+          <h3>{t("Ultimas mediciones")}</h3>
+          <span>
+            {recentMeasurements.length} {t("registros")}
+          </span>
         </div>
         {loading ? (
-          <p>Cargando mediciones...</p>
+          <p>{t("Cargando mediciones...")}</p>
         ) : recentMeasurements.length === 0 ? (
-          <p>No hay mediciones disponibles.</p>
+          <p>{t("No hay mediciones disponibles.")}</p>
         ) : (
           <table>
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Nodo</th>
-                <th>Sensor</th>
-                <th>Valor</th>
-                <th>Fecha</th>
+                <th>{t("Nodo")}</th>
+                <th>{t("Sensor")}</th>
+                <th>{t("Valor")}</th>
+                <th>{t("Fecha")}</th>
               </tr>
             </thead>
             <tbody>
               {recentMeasurements.map((row) => {
                 const sensorType = sensorTypeMap.get(row.sensor_type_id);
-                const sensorLabel = formatSensorTypeLabel(sensorType) || `ID ${row.sensor_type_id}`;
-
+                const sensorLabel =
+                  formatSensorTypeLabel(sensorType) || `ID ${row.sensor_type_id}`;
                 return (
                   <tr key={row.measurement_id}>
                     <td>{row.measurement_id}</td>

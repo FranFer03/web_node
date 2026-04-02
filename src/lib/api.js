@@ -1,18 +1,28 @@
+import { getAuthState } from "./auth";
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "https://almacenamiento-api-pf.s4bnsc.easypanel.host/";
 
-function buildErrorMessage(status, statusText, data) {
-  if (data?.detail) return data.detail;
-  if (data?.message) return data.message;
-  if (data?.error) return data.error;
-  return `HTTP ${status} - ${statusText}`;
+function buildErrorMessage(status, data) {
+  if (import.meta.env.DEV) console.error("API error:", status, data);
+  if (status === 401 || status === 403) return "Acceso no autorizado.";
+  if (status === 404) return "Recurso no encontrado.";
+  if (status === 409) return data?.detail || "Conflicto con datos existentes.";
+  if (status === 422) return "Datos inválidos.";
+  if (status >= 500) return "Error del servidor. Intente nuevamente.";
+  return data?.detail || data?.message || data?.error || `Error inesperado (${status}).`;
 }
 
 export async function apiRequest(path, options = {}) {
+  const { token } = getAuthState();
+  const authHeader =
+    token && token !== "session" ? { Authorization: `Bearer ${token}` } : {};
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      ...authHeader,
       ...(options.headers || {}),
     },
     ...options,
@@ -26,7 +36,7 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(buildErrorMessage(response.status, response.statusText, data));
+    throw new Error(buildErrorMessage(response.status, data));
   }
 
   return data;

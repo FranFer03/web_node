@@ -1564,3 +1564,166 @@ th {
 [data-theme="light"] .log-node  { color: #2563eb; }
 [data-theme="light"] .log-message { color: #1e293b; }
 [data-theme="light"] .log-entry { border-bottom-color: rgba(0,0,0,0.04); }
+
+/* ─── Global focus ring (U1) ─────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
+.lang-toggle:focus-visible,
+.sidebar-logout-icon:focus-visible {
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+/* ─── Button touch targets (V8) ─────────────────────────────────── */
+.btn-primary,
+.btn-muted,
+.btn-outline {
+  min-height: 44px;
+}
+
+/* ─── Nav-item hover (V2) ────────────────────────────────────────── */
+.nav-item:hover:not(.active) {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ─── Node-card hover (V3) ───────────────────────────────────────── */
+.node-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.node-card:hover {
+  border-color: var(--orange);
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.12);
+}
+
+/* ─── Node-grid responsive (V7) ──────────────────────────────────── */
+.node-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+@media (max-width: 1000px) { .node-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); } }
+@media (max-width: 480px)  { .node-grid { grid-template-columns: 1fr; } }
+
+/* ─── Node metrics — remove inline styles (V7) ───────────────────── */
+.node-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  flex-wrap: unset;
+}
+
+/* ─── Trend chart — theme-neutral background (V6) ───────────────── */
+.trend-chart {
+  background: var(--surface);
+}
+
+/* ─── Modal classes — extract from inline styles (V1) ───────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-dialog {
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Success box (U6) ───────────────────────────────────────────── */
+.success-box {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: var(--green);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-size: 0.88rem;
+}
+
+/* ─── Form actions row (V1) ──────────────────────────────────────── */
+.form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ─── Table action buttons (V1) ──────────────────────────────────── */
+.table-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ─── Last updated label (U5) ────────────────────────────────────── */
+.last-updated {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+/* ─── WS status dot — fix glow currentColor (V5) ────────────────── */
+.ws-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+  /* color is set via style prop so currentColor matches background */
+}
+
+/* ─── WS connecting pulse animation (V4) ────────────────────────── */
+@keyframes ws-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.ws-status-dot.connecting,
+.status-dot.connecting {
+  animation: ws-pulse 1.2s ease-in-out infinite;
+}
+
+/* ─── Topbar status dot now inherits from inline style (W2) ─────── */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* ─── Fix log-ts contrast (U8) ───────────────────────────────────── */
+.log-ts {
+  color: #718096;
+}
+[data-theme="light"] .log-ts { color: #94a3b8; }
+
+/* ─── Log entry border — use token (V5) ──────────────────────────── */
+.log-entry {
+  border-bottom: 1px solid var(--panel-border);
+}
+
+/* ─── Sidebar expand button when collapsed ───────────────────────── */
+.sidebar-collapse-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.sidebar-collapse-toggle:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+/* ─── Mobile: hide "Live" text, show dot only (U.4.1) ───────────── */
+@media (max-width: 480px) {
+  .topbar-connection span:last-child { display: none; }
+  .log-terminal { max-height: 45vh; }
+}

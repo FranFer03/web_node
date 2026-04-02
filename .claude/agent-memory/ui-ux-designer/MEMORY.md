@@ -1,0 +1,1 @@
+- [LoRa Mesh Monitor — Project Design Context](project_lora_mesh_monitor.md) — React 18 + Vite, custom CSS only, dark/light themes, Spanish/English i18n, WebSocket logs, SVG charts

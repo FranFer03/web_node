@@ -28,7 +28,11 @@ export default function LoginPage() {
       }
 
       setAuthState(result);
-      const redirectTo = location.state?.from || "/dashboard";
+      const raw = location.state?.from;
+      const redirectTo =
+        typeof raw === "string" && raw.startsWith("/") && !raw.startsWith("//")
+          ? raw
+          : "/dashboard";
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(err.message || t("Error al conectar con la API"));

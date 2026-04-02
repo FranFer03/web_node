@@ -10,27 +10,30 @@ import PacketLogsPage from "./pages/PacketLogsPage";
 import AboutPage from "./pages/AboutPage";
 import DownloadPage from "./pages/DownloadPage";
 import { ThemeLangProvider } from "./contexts/ThemeLangContext";
+import { WsStatusProvider } from "./contexts/WsStatusContext";
 
 export default function App() {
   return (
     <ThemeLangProvider>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/download" element={<DownloadPage />} />
-        <Route path="/login" element={<LoginPage />} />
+      <WsStatusProvider>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/download" element={<DownloadPage />} />
+          <Route path="/login" element={<LoginPage />} />
 
-        <Route element={<ProtectedRoute />}>
-          <Route element={<AppShell />}>
-            <Route path="/dashboard" element={<HistoricalDashboardPage />} />
-            <Route path="/nodes-visualizer" element={<NodesVisualizerPage />} />
-            <Route path="/nodes-manager" element={<NodesManagerPage />} />
-            <Route path="/packet-logs" element={<PacketLogsPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppShell />}>
+              <Route path="/dashboard" element={<HistoricalDashboardPage />} />
+              <Route path="/nodes-visualizer" element={<NodesVisualizerPage />} />
+              <Route path="/nodes-manager" element={<NodesManagerPage />} />
+              <Route path="/packet-logs" element={<PacketLogsPage />} />
+            </Route>
           </Route>
-        </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </WsStatusProvider>
     </ThemeLangProvider>
   );
 }
