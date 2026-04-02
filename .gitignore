@@ -2,6 +2,8 @@ node_modules/
 dist/
 .vite/
 .env
+.agent/
+.agents/
 
 # Reference Stitch exports/templates kept local for UI parity work
 stitch_login_admin_access/
