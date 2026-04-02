@@ -138,7 +138,16 @@ const translations = {
     "Los datos se enrutan por saltos intermedios para extender cobertura y mejorar resiliencia.": "Data is routed via intermediate hops to extend coverage and improve resilience.",
     "Centralizacion de datos y visualizacion historica en una interfaz web simple.": "Data centralization and historical visualization in a simple web interface.",
     "Aplicaciones potenciales": "Potential Applications",
-    "Agricultura de precision, monitoreo ambiental, energias renovables e iniciativas academicas que requieren telemetria confiable en zonas remotas.": "Precision agriculture, environmental monitoring, renewable energies and academic initiatives that require reliable telemetry in remote areas."
+    "Agricultura de precision, monitoreo ambiental, energias renovables e iniciativas academicas que requieren telemetria confiable en zonas remotas.": "Precision agriculture, environmental monitoring, renewable energies and academic initiatives that require reliable telemetry in remote areas.",
+    "Flujo de logs en tiempo real via WebSocket.": "Real-time log stream via WebSocket.",
+    "Conectado": "Connected",
+    "Conectando...": "Connecting...",
+    "Desconectado": "Disconnected",
+    "Auto-scroll": "Auto-scroll",
+    "Limpiar": "Clear",
+    "entradas": "entries",
+    "Esperando logs...": "Waiting for logs...",
+    "Sin conexion al servidor": "No server connection"
   },
   es: {
     "Features": "Características",
