@@ -22,7 +22,7 @@ export default function LoginPage() {
 
     try {
       const result = await loginUser(form.usuario, form.contrasena);
-      if (!result?.success) {
+      if (!result?.access_token || !result?.refresh_token) {
         setError(t("Credenciales invalidas"));
         return;
       }

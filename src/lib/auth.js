@@ -1,7 +1,11 @@
-const AUTH_KEY = "lora_auth";
+const ACCESS_TOKEN_KEY = "lora_access_token";
+const REFRESH_TOKEN_KEY = "lora_refresh_token";
 const USER_KEY = "lora_user";
-const EXPIRATION_KEY = "lora_auth_expiry";
-const DAYS_TO_PERSIST = 7;
+const EXPIRATION_KEY = "lora_access_expiry";
+
+function dispatchAuthChanged() {
+  window.dispatchEvent(new Event("auth-changed"));
+}
 
 function isSafeAvatarUrl(url) {
   if (!url || typeof url !== "string") return false;
@@ -37,24 +41,41 @@ export { resolveAvatarUrl };
 
 export function getAuthState() {
   const expiry = localStorage.getItem(EXPIRATION_KEY);
-  if (expiry && Date.now() > parseInt(expiry)) {
-    clearAuthState();
-    return { isAuthenticated: false, token: null, user: null };
+  const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+  if (expiry && Date.now() > Number.parseInt(expiry, 10)) {
+    return {
+      isAuthenticated: Boolean(refreshToken),
+      accessToken: null,
+      refreshToken,
+      token: null,
+      user: parseUser(),
+    };
   }
 
-  const token = localStorage.getItem(AUTH_KEY);
+  return {
+    isAuthenticated: Boolean(accessToken || refreshToken),
+    accessToken,
+    refreshToken,
+    token: accessToken,
+    user: parseUser(),
+  };
+}
+
+function parseUser() {
   const userRaw = localStorage.getItem(USER_KEY);
   const parsedUser = userRaw ? JSON.parse(userRaw) : null;
-  const user = parsedUser
+  return parsedUser
     ? { ...parsedUser, avatarUrl: parsedUser.avatarUrl || resolveAvatarUrl(parsedUser) }
     : null;
-
-  return { isAuthenticated: Boolean(token), token, user };
 }
 
 export function setAuthState(loginData) {
-  const token = loginData?.token;
-  if (!token) throw new Error("Login response missing token");
+  const accessToken = loginData?.access_token;
+  const refreshToken = loginData?.refresh_token;
+  const expiresIn = Number(loginData?.expires_in || 900);
+  if (!accessToken || !refreshToken) throw new Error("Login response missing JWT tokens");
 
   const avatarUrl = resolveAvatarUrl(loginData?.user) || resolveAvatarUrl(loginData);
   const user = {
@@ -64,14 +85,25 @@ export function setAuthState(loginData) {
     avatarUrl,
   };
 
-  const expiry = Date.now() + DAYS_TO_PERSIST * 24 * 60 * 60 * 1000;
-  localStorage.setItem(AUTH_KEY, token);
+  const expiry = Date.now() + expiresIn * 1000;
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   localStorage.setItem(EXPIRATION_KEY, expiry.toString());
+  dispatchAuthChanged();
+}
+
+export function updateAccessToken(accessToken, expiresIn) {
+  const expiry = Date.now() + Number(expiresIn || 900) * 1000;
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(EXPIRATION_KEY, expiry.toString());
+  dispatchAuthChanged();
 }
 
 export function clearAuthState() {
-  localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(EXPIRATION_KEY);
+  dispatchAuthChanged();
 }

@@ -1,28 +1,21 @@
-import { getAuthState } from "./auth";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://almacenamiento-api-pf.s4bnsc.easypanel.host/";
+import { appSocket, API_BASE_URL } from "./appSocket";
+import { clearAuthState, getAuthState } from "./auth";
 
 function buildErrorMessage(status, data) {
   if (import.meta.env.DEV) console.error("API error:", status, data);
   if (status === 401 || status === 403) return "Acceso no autorizado.";
   if (status === 404) return "Recurso no encontrado.";
   if (status === 409) return data?.detail || "Conflicto con datos existentes.";
-  if (status === 422) return "Datos inválidos.";
+  if (status === 422) return "Datos invalidos.";
   if (status >= 500) return "Error del servidor. Intente nuevamente.";
   return data?.detail || data?.message || data?.error || `Error inesperado (${status}).`;
 }
 
-export async function apiRequest(path, options = {}) {
-  const { token } = getAuthState();
-  const authHeader =
-    token && token !== "session" ? { Authorization: `Bearer ${token}` } : {};
-
+async function httpRequest(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
-      ...authHeader,
       ...(options.headers || {}),
     },
     ...options,
@@ -43,38 +36,47 @@ export async function apiRequest(path, options = {}) {
 }
 
 export async function loginUser(usuario, contrasena) {
-  return apiRequest("/users/login", {
+  return httpRequest("/users/login", {
     method: "POST",
     body: JSON.stringify({ usuario, contrasena }),
   });
 }
 
+export async function logoutUser() {
+  const { refreshToken } = getAuthState();
+  if (!refreshToken) {
+    clearAuthState();
+    return;
+  }
+  try {
+    await httpRequest("/users/logout", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+  } finally {
+    clearAuthState();
+    appSocket.disconnect();
+  }
+}
+
 export async function getDeviceNodes() {
-  return apiRequest("/device-nodes");
+  return appSocket.request("nodes.list");
 }
 
 export async function createDeviceNode(payload) {
-  return apiRequest("/device-nodes", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return appSocket.request("nodes.create", payload);
 }
 
 export async function updateDeviceNode(nodeId, payload) {
-  return apiRequest(`/device-nodes/${nodeId}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
+  return appSocket.request("nodes.update", { node_id: Number(nodeId), ...payload });
 }
 
 export async function deleteDeviceNode(nodeId) {
-  return apiRequest(`/device-nodes/${nodeId}`, {
-    method: "DELETE",
-  });
+  return appSocket.request("nodes.delete", { node_id: Number(nodeId) });
 }
 
 export async function getMeasurements() {
-  return apiRequest("/measurements");
+  return appSocket.request("measurements.list_recent");
 }
 
 function filterByDateRange(rows, startDate, endDate) {
@@ -94,19 +96,33 @@ function filterByDateRange(rows, startDate, endDate) {
 }
 
 export async function getMeasurementsFiltered({ startDate, endDate, nodeId } = {}) {
-  const allRows = await apiRequest("/measurements/filter");
-  const rows = Array.isArray(allRows) ? allRows : [];
-  const filteredByNode =
-    nodeId && nodeId !== "all" ? rows.filter((row) => row.node_id === Number(nodeId)) : rows;
+  const rows = await appSocket.request("measurements.filter", {
+    start_date: startDate || null,
+    end_date: endDate || null,
+    node_id: nodeId && nodeId !== "all" ? Number(nodeId) : null,
+  });
 
   return {
-    rows: filterByDateRange(filteredByNode, startDate, endDate),
+    rows: filterByDateRange(Array.isArray(rows) ? rows : [], startDate, endDate),
     usedFallback: false,
   };
 }
 
 export async function getSensorTypes() {
-  return apiRequest("/sensor-types");
+  return appSocket.request("sensor_types.list");
+}
+
+export async function getLogs({ skip = 0, limit = 100, nodeId = null, level = null } = {}) {
+  return appSocket.request("logs.list", {
+    skip,
+    limit,
+    node_id: nodeId,
+    level,
+  });
+}
+
+export async function createLog(payload) {
+  return appSocket.request("logs.create", payload);
 }
 
 export { API_BASE_URL };

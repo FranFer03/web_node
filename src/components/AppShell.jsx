@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { clearAuthState, getAuthState, resolveAvatarUrl } from "../lib/auth";
+import { getAuthState, resolveAvatarUrl } from "../lib/auth";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 import { useWsStatus } from "../contexts/WsStatusContext";
 import BrandLogo from "./BrandLogo";
+import { logoutUser } from "../lib/api";
 
 export default function AppShell() {
   const navigate = useNavigate();
@@ -39,10 +40,12 @@ export default function AppShell() {
     { to: "/nodes-visualizer", label: t("Panel de nodos"), icon: "map", subtitle: t("Informacion general de nodos") },
     { to: "/nodes-manager", label: t("Gestor de nodos"), icon: "settings_input_antenna", subtitle: t("Edit Node Configuration") },
     { to: "/packet-logs", label: t("Log de Paquetes"), icon: "terminal", subtitle: "Traffic analysis" },
+    { to: "/download", label: t("Descargas"), icon: "download", subtitle: t("Recursos") },
+    { to: "/about", label: t("Nosotros"), icon: "groups", subtitle: t("Equipo") },
   ];
 
-  function logout() {
-    clearAuthState();
+  async function logout() {
+    await logoutUser();
     navigate("/login", { replace: true });
   }
 
@@ -50,7 +53,9 @@ export default function AppShell() {
     location.pathname.startsWith("/dashboard") ||
     location.pathname.startsWith("/nodes-visualizer") ||
     location.pathname.startsWith("/nodes-manager") ||
-    location.pathname.startsWith("/packet-logs");
+    location.pathname.startsWith("/packet-logs") ||
+    location.pathname.startsWith("/about") ||
+    location.pathname.startsWith("/download");
 
   const wsStatusColor = {
     connecting: "var(--orange)",

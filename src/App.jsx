@@ -18,8 +18,6 @@ export default function App() {
       <WsStatusProvider>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/download" element={<DownloadPage />} />
           <Route path="/login" element={<LoginPage />} />
 
           <Route element={<ProtectedRoute />}>
@@ -28,6 +26,8 @@ export default function App() {
               <Route path="/nodes-visualizer" element={<NodesVisualizerPage />} />
               <Route path="/nodes-manager" element={<NodesManagerPage />} />
               <Route path="/packet-logs" element={<PacketLogsPage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/download" element={<DownloadPage />} />
             </Route>
           </Route>
 
