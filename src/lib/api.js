@@ -112,17 +112,44 @@ export async function getSensorTypes() {
   return appSocket.request("sensor_types.list");
 }
 
-export async function getLogs({ skip = 0, limit = 100, nodeId = null, level = null } = {}) {
+export async function getLogs({
+  skip = 0,
+  limit = 100,
+  nodeId = null,
+  level = null,
+  search = "",
+  dateFrom = "",
+  dateTo = "",
+} = {}) {
   return appSocket.request("logs.list", {
     skip,
     limit,
     node_id: nodeId,
     level,
+    search: search || null,
+    date_from: dateFrom || null,
+    date_to: dateTo || null,
   });
 }
 
 export async function createLog(payload) {
   return appSocket.request("logs.create", payload);
+}
+
+export async function getLogsCount({
+  nodeId = null,
+  level = null,
+  search = "",
+  dateFrom = "",
+  dateTo = "",
+} = {}) {
+  return appSocket.request("logs.count", {
+    node_id: nodeId,
+    level,
+    search: search || null,
+    date_from: dateFrom || null,
+    date_to: dateTo || null,
+  });
 }
 
 export { API_BASE_URL };
