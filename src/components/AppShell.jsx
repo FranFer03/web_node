@@ -40,8 +40,6 @@ export default function AppShell() {
     { to: "/nodes-visualizer", label: t("Panel de nodos"), icon: "map", subtitle: t("Informacion general de nodos") },
     { to: "/nodes-manager", label: t("Gestor de nodos"), icon: "settings_input_antenna", subtitle: t("Edit Node Configuration") },
     { to: "/packet-logs", label: t("Log de Paquetes"), icon: "terminal", subtitle: "Traffic analysis" },
-    { to: "/download", label: t("Descargas"), icon: "download", subtitle: t("Recursos") },
-    { to: "/about", label: t("Nosotros"), icon: "groups", subtitle: t("Equipo") },
   ];
 
   async function logout() {
@@ -53,9 +51,7 @@ export default function AppShell() {
     location.pathname.startsWith("/dashboard") ||
     location.pathname.startsWith("/nodes-visualizer") ||
     location.pathname.startsWith("/nodes-manager") ||
-    location.pathname.startsWith("/packet-logs") ||
-    location.pathname.startsWith("/about") ||
-    location.pathname.startsWith("/download");
+    location.pathname.startsWith("/packet-logs");
 
   const wsStatusColor = {
     connecting: "var(--orange)",
@@ -97,20 +93,13 @@ export default function AppShell() {
         id="app-sidebar"
         ref={sidebarRef}
         className={`sidebar ${mobileOpen ? "open" : ""} ${collapsed ? "collapsed" : ""}`}
+        onClick={collapsed ? () => setCollapsed(false) : undefined}
       >
         <div className="brand-block">
           <Link to="/" aria-label="Volver al inicio" className="sidebar-logo-link">
             <BrandLogo className={collapsed ? "sidebar-brand-logo--mini" : "sidebar-brand-logo"} />
           </Link>
-          {collapsed ? (
-            <button
-              className="sidebar-collapse-toggle"
-              onClick={() => setCollapsed(false)}
-              aria-label="Expand sidebar"
-            >
-              <span className="material-symbols-outlined">chevron_right</span>
-            </button>
-          ) : (
+          {!collapsed && (
             <button
               className="sidebar-collapse-toggle sidebar-collapse-toggle--close"
               onClick={() => setCollapsed(true)}
