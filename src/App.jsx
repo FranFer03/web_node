@@ -19,6 +19,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/download" element={<DownloadPage />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
@@ -26,8 +28,6 @@ export default function App() {
               <Route path="/nodes-visualizer" element={<NodesVisualizerPage />} />
               <Route path="/nodes-manager" element={<NodesManagerPage />} />
               <Route path="/packet-logs" element={<PacketLogsPage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/download" element={<DownloadPage />} />
             </Route>
           </Route>
 

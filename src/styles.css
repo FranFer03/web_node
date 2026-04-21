@@ -288,12 +288,6 @@ input {
   max-width: 560px;
 }
 
-.hero-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
-
 .hero-map {
   display: flex;
   align-items: center;
@@ -331,6 +325,10 @@ input {
 
 .feature-grid p {
   color: var(--text-muted);
+}
+
+.feature-grid--single {
+  padding-top: 0;
 }
 
 .cta {
@@ -371,6 +369,47 @@ input {
 .landing-footer div {
   display: flex;
   gap: 1rem;
+}
+
+.public-page-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.public-hero {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3.5rem 2rem 1rem;
+  width: 100%;
+}
+
+.public-hero-copy {
+  max-width: 760px;
+  padding: 2rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 30%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+    var(--surface);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+}
+
+.public-hero-copy h1 {
+  margin: 1rem 0 0.75rem;
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  line-height: 1;
+}
+
+.public-hero-copy p {
+  margin: 0;
+  max-width: 58ch;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+}
+
+.public-content-section {
+  width: 100%;
 }
 
 .login-page {
@@ -1211,7 +1250,7 @@ th {
 
 .about-section,
 .download-section {
-  padding: 4rem 2rem;
+  padding: 2rem 2rem 4rem;
   max-width: 1000px;
   margin: 0 auto;
   text-align: center;
@@ -1240,9 +1279,10 @@ th {
   padding: 2.5rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 1.2rem;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-align: left;
 }
 
 .download-card:hover {
@@ -1264,6 +1304,7 @@ th {
   color: var(--text-muted);
   line-height: 1.6;
   margin-bottom: 1rem;
+  flex: 1;
 }
 
 .highlighted-card {
@@ -1282,30 +1323,26 @@ th {
 }
 
 .about-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
 }
 
 .about-card {
   display: flex;
-  align-items: center;
-  gap: 2.5rem;
+  align-items: flex-start;
+  gap: 1.5rem;
   background: var(--surface);
   border: 1px solid var(--surface-border);
   border-radius: 16px;
-  padding: 2.5rem;
+  padding: 2rem;
   text-align: left;
 }
 
-.about-card:nth-child(even) {
-  flex-direction: row-reverse;
-}
-
 .about-photo {
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
+  width: 112px;
+  height: 112px;
+  border-radius: 28px;
   object-fit: cover;
   border: 4px solid var(--panel);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
@@ -1316,6 +1353,7 @@ th {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  gap: 0.75rem;
 }
 
 .about-info h3 {
@@ -1367,6 +1405,14 @@ th {
     gap: 0.55rem;
   }
 
+  .public-hero {
+    padding: 2.5rem 1rem 0.5rem;
+  }
+
+  .public-hero-copy {
+    padding: 1.5rem;
+  }
+
   .landing-header,
   .login-header,
   .topbar {
@@ -1387,11 +1433,15 @@ th {
   }
 
   .about-card,
-  .about-card:nth-child(even) {
+  .download-card {
     flex-direction: column;
-    text-align: center;
     padding: 1.5rem;
-    gap: 1.5rem;
+    gap: 1.25rem;
+  }
+
+  .about-card {
+    text-align: center;
+    align-items: center;
   }
 
   .landing-footer {

@@ -1,20 +1,25 @@
 import personaje1 from "../../assets/integrantes/personaje1.jpg";
 import personaje2 from "../../assets/integrantes/personaje2.jpg";
 import { useThemeLang } from "../contexts/ThemeLangContext";
+import PublicPageShell from "../components/PublicPageShell";
 
 export default function AboutPage() {
   const { t } = useThemeLang();
 
   return (
-    <div className="panel-page">
-      <div className="panel-heading-row">
-        <div>
-          <h2>{t("Nosotros")}</h2>
-          <p>{t("Desarrolladores del proyecto final de Ingenieria Electronica")}</p>
-        </div>
-      </div>
-
-      <section className="about-section" id="nosotros">
+    <PublicPageShell
+      activeSection="about"
+      hero={(
+        <section className="public-hero public-hero--about">
+          <div className="public-hero-copy">
+            <span className="pill">{t("Equipo de Desarrollo")}</span>
+            <h1>{t("Nosotros")}</h1>
+            <p>{t("Desarrolladores del proyecto Final de Ingenieria Electronica")}</p>
+          </div>
+        </section>
+      )}
+    >
+      <section className="about-section public-content-section" id="nosotros">
         <div className="about-grid">
           <article className="about-card">
             <img src={personaje1} alt="Integrante 1" className="about-photo" />
@@ -40,6 +45,6 @@ export default function AboutPage() {
           </article>
         </div>
       </section>
-    </div>
+    </PublicPageShell>
   );
 }
