@@ -6,6 +6,7 @@ import L from "leaflet";
 import { getLatestMeasurementsByNode, getLogs, updateDeviceNode } from "../lib/api";
 import { appSocket } from "../lib/appSocket";
 import { useThemeLang } from "../contexts/ThemeLangContext";
+import { extractRealtimeLog } from "../lib/realtimeLogs";
 
 const COVERAGE_RADIUS_METERS = 1000;
 const LOG_LIMIT = 3;
@@ -98,6 +99,7 @@ export default function NodesVisualizerPage() {
   const [intervalSaving, setIntervalSaving] = useState(false);
   const [intervalMinutes, setIntervalMinutes] = useState(MIN_INTERVAL_MINUTES);
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
+  const intervalMinutesRef = useRef(MIN_INTERVAL_MINUTES);
 
   const nodesById = useMemo(() => {
     const map = new Map();
@@ -112,6 +114,10 @@ export default function NodesVisualizerPage() {
   useEffect(() => {
     selectedNodeIdRef.current = selectedNodeId;
   }, [selectedNodeId]);
+
+  useEffect(() => {
+    intervalMinutesRef.current = intervalMinutes;
+  }, [intervalMinutes]);
 
   const visibleNodes = useMemo(() => {
     return nodes.filter((node) => {
@@ -166,6 +172,23 @@ export default function NodesVisualizerPage() {
       mergeRealtimeSnapshot(snapshot);
     });
 
+    const unsubLogs = appSocket.subscribe("logs.new", async (payload) => {
+      const log = extractRealtimeLog(payload);
+      if (!log || log.node_id !== selectedNodeIdRef.current) return;
+
+      setLogs((prev) => {
+        const exists = prev.some((row) => String(row.log_id) === String(log.log_id));
+        if (exists) return prev;
+        return [log, ...prev].slice(0, LOG_LIMIT);
+      });
+      setLogsError("");
+      setLogsLoading(false);
+
+      if (!payload?.log && !payload?.data) {
+        await loadNodeLogs(log.node_id);
+      }
+    });
+
     const unsubNodes = appSocket.subscribe("nodes.changed", async (event) => {
       if (event?.action === "delete" && event?.data?.node_id === selectedNodeIdRef.current) {
         setSelectedNodeId(null);
@@ -175,6 +198,7 @@ export default function NodesVisualizerPage() {
 
     return () => {
       unsubRealtime();
+      unsubLogs();
       unsubNodes();
     };
   }, []);
@@ -339,7 +363,7 @@ export default function NodesVisualizerPage() {
 
   async function handleIntervalCommit() {
     if (!selectedNode || intervalSaving) return;
-    const nextSeconds = toRefreshRateSeconds(intervalMinutes);
+    const nextSeconds = toRefreshRateSeconds(intervalMinutesRef.current);
     if (nextSeconds === selectedNode.refresh_rate) return;
 
     try {
@@ -531,6 +555,12 @@ export default function NodesVisualizerPage() {
                     onChange={(e) => setIntervalMinutes(Number(e.target.value))}
                     onMouseUp={handleIntervalCommit}
                     onTouchEnd={handleIntervalCommit}
+                    onPointerUp={handleIntervalCommit}
+                    onKeyUp={(e) => {
+                      if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(e.key)) {
+                        handleIntervalCommit();
+                      }
+                    }}
                     onBlur={handleIntervalCommit}
                     disabled={intervalSaving}
                     className="realtime-slider"

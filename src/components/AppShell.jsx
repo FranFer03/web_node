@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { getAuthState, resolveAvatarUrl } from "../lib/auth";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 import { logoutUser } from "../lib/api";
+import { appSocket } from "../lib/appSocket";
+import { extractRealtimeLog, LOG_TOAST_EXIT_MS, LOG_TOAST_TTL_MS } from "../lib/realtimeLogs";
 
 function DockNavItem({ to, icon, label, onClick }) {
   return (
@@ -20,19 +22,37 @@ function DockNavItem({ to, icon, label, onClick }) {
   );
 }
 
+function DockUserItem({ active, avatarEl, label, onClick }) {
+  return (
+    <button
+      type="button"
+      className={`dock-nav-item dock-user-trigger ${active ? "active" : ""}`}
+      aria-label={label}
+      title={label}
+      aria-expanded={active}
+      aria-haspopup="menu"
+      onClick={onClick}
+    >
+      {avatarEl}
+    </button>
+  );
+}
+
 export default function AppShell() {
   const navigate = useNavigate();
   const { user } = getAuthState();
   const avatarUrl = resolveAvatarUrl(user);
   const { theme, toggleTheme, language, changeLanguage, t } = useThemeLang();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [logToasts, setLogToasts] = useState([]);
   const userMenuRef = useRef(null);
+  const toastTimersRef = useRef(new Map());
 
   const navItems = [
-    { to: "/dashboard-historico", label: t("Dashboard"), icon: "bar_chart" },
     { to: "/tiempo-real", label: t("Tiempo real"), icon: "monitoring" },
-    { to: "/nodes-manager", label: t("Gestor de nodos"), icon: "settings_input_antenna" },
-    { to: "/packet-logs", label: t("Log de Paquetes"), icon: "terminal" },
+    { to: "/dashboard-historico", label: t("Analisis estrategico"), icon: "bar_chart" },
+    { to: "/nodes-manager", label: t("Gestor de nodo"), icon: "settings_input_antenna" },
+    { to: "/packet-logs", label: t("Log"), icon: "terminal" },
   ];
 
   useEffect(() => {
@@ -44,6 +64,49 @@ export default function AppShell() {
 
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = appSocket.subscribe("logs.new", (payload) => {
+      const log = extractRealtimeLog(payload);
+      if (!log) return;
+
+      const toastId = `${log.log_id}-${Date.now()}`;
+      setLogToasts((prev) => {
+        const next = [
+          ...prev,
+          {
+            id: toastId,
+            stage: "enter",
+            nodeId: log.node_id,
+            level: log.level,
+            message: log.message,
+          },
+        ];
+        return next.slice(-4);
+      });
+
+      const exitTimer = setTimeout(() => {
+        setLogToasts((prev) =>
+          prev.map((toast) => (toast.id === toastId ? { ...toast, stage: "exit" } : toast))
+        );
+      }, LOG_TOAST_TTL_MS);
+
+      const removeTimer = setTimeout(() => {
+        setLogToasts((prev) => prev.filter((toast) => toast.id !== toastId));
+        toastTimersRef.current.delete(toastId);
+      }, LOG_TOAST_TTL_MS + LOG_TOAST_EXIT_MS);
+
+      toastTimersRef.current.set(toastId, [exitTimer, removeTimer]);
+    });
+
+    return () => {
+      unsubscribe();
+      for (const timers of toastTimersRef.current.values()) {
+        for (const timer of timers) clearTimeout(timer);
+      }
+      toastTimersRef.current.clear();
+    };
   }, []);
 
   async function handleLogout() {
@@ -63,6 +126,8 @@ export default function AppShell() {
       changeLanguage(nextLanguage);
     }
   }
+
+  const userLabel = useMemo(() => t("Usuarios"), [t]);
 
   const avatarEl = (
     <div className="user-avatar user-avatar--dock">
@@ -97,17 +162,12 @@ export default function AppShell() {
           ))}
 
           <div className="dock-user-wrap" ref={userMenuRef}>
-            <button
-              type="button"
-              className={`dock-nav-item dock-user-trigger ${userMenuOpen ? "active" : ""}`}
-              aria-label={t("Usuario")}
-              title={t("Usuario")}
-              aria-expanded={userMenuOpen}
-              aria-haspopup="menu"
+            <DockUserItem
+              active={userMenuOpen}
+              avatarEl={avatarEl}
+              label={userLabel}
               onClick={() => setUserMenuOpen((prev) => !prev)}
-            >
-              {avatarEl}
-            </button>
+            />
 
             {userMenuOpen && (
               <div className="dock-user-popover" role="menu">
@@ -163,6 +223,18 @@ export default function AppShell() {
             )}
           </div>
         </nav>
+      </div>
+
+      <div className="log-toast-stack" aria-live="polite" aria-atomic="false">
+        {logToasts.map((toast) => (
+          <article key={toast.id} className={`log-toast log-toast--${toast.stage}`}>
+            <div className="log-toast__head">
+              <strong>{`N${toast.nodeId}`}</strong>
+              <span>{toast.level}</span>
+            </div>
+            <p>{toast.message}</p>
+          </article>
+        ))}
       </div>
     </div>
   );

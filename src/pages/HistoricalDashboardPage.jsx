@@ -355,7 +355,7 @@ export default function HistoricalDashboardPage() {
       <div className="panel-heading-row">
         <div>
           <span className="section-kicker">Monitoring</span>
-          <h2>{t("Dashboard")}</h2>
+          <h2>{t("Analisis estrategico")}</h2>
           <p>{t("Evolucion de lecturas del ultimo mes por sensor y por nodo.")}</p>
         </div>
         <button
