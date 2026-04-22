@@ -1,19 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
-import { getDeviceNodes, getLogs, getLogsCount } from "../lib/api";
+import {
+  deleteLogsBulk,
+  exportLogs,
+  getDeviceNodes,
+  getLogs,
+  getLogsCount,
+  getLogsStats,
+} from "../lib/api";
 import { appSocket } from "../lib/appSocket";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 
 const PAGE_SIZE = 10;
 const LEVEL_OPTIONS = ["ALL", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"];
-
-const LEVEL_COLORS = {
-  DEBUG: "#8a99b3",
-  INFO: "#10b981",
-  WARNING: "#f59e0b",
-  ERROR: "#ef4444",
-  CRITICAL: "#a855f7",
-};
 
 const EMPTY_FILTERS = {
   search: "",
@@ -23,257 +22,411 @@ const EMPTY_FILTERS = {
   level: "ALL",
 };
 
+const LEVEL_TONE = {
+  DEBUG: "debug",
+  INFO: "info",
+  WARNING: "warning",
+  ERROR: "error",
+  CRITICAL: "critical",
+};
+
+function getTimestamp(log) {
+  return log?.created_at || log?.timestamp || null;
+}
+
+function toMillis(value) {
+  if (!value) return null;
+  const ts = new Date(value).getTime();
+  return Number.isNaN(ts) ? null : ts;
+}
+
+function matchesFilters(log, filters) {
+  const search = filters.search.trim().toLowerCase();
+  const message = String(log?.message || "").toLowerCase();
+  const nodeLabel = String(log?.node_id || "");
+  const level = String(log?.level || "").toUpperCase();
+  const ts = toMillis(getTimestamp(log));
+
+  if (filters.nodeId && Number(filters.nodeId) !== Number(log?.node_id)) return false;
+  if (filters.level !== "ALL" && filters.level !== level) return false;
+  if (search && !message.includes(search) && !nodeLabel.includes(search)) return false;
+
+  if (filters.dateFrom) {
+    const fromTs = new Date(`${filters.dateFrom}T00:00:00`).getTime();
+    if (ts === null || ts < fromTs) return false;
+  }
+
+  if (filters.dateTo) {
+    const toTs = new Date(`${filters.dateTo}T23:59:59.999`).getTime();
+    if (ts === null || ts > toTs) return false;
+  }
+
+  return true;
+}
+
+function formatDateTime(value, locale = "es-AR") {
+  const ts = getTimestamp({ created_at: value });
+  if (!ts) return { date: "-", time: "-" };
+  const parsed = new Date(ts);
+  if (Number.isNaN(parsed.getTime())) return { date: "-", time: "-" };
+  return {
+    date: parsed.toLocaleDateString(locale),
+    time: parsed.toLocaleTimeString(locale, { hour12: false }),
+  };
+}
+
+function buildExportName(baseName, fallbackName) {
+  if (!baseName) return fallbackName;
+  return baseName.replace(/[^\w.-]+/g, "_");
+}
+
 export default function PacketLogsPage() {
-  const { t } = useThemeLang();
+  const { t, language } = useThemeLang();
   const [logs, setLogs] = useState([]);
   const [nodes, setNodes] = useState([]);
   const [total, setTotal] = useState(0);
+  const [criticalLast24h, setCriticalLast24h] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
-  const [autoScroll, setAutoScroll] = useState(true);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
+  const [refreshTick, setRefreshTick] = useState(0);
   const tableWrapRef = useRef(null);
+  const requestIdRef = useRef(0);
+
+  const deferredSearch = useDeferredValue(filters.search);
+  const activeFilters = useMemo(
+    () => ({
+      ...filters,
+      search: deferredSearch.trim(),
+    }),
+    [filters, deferredSearch],
+  );
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  const loadLogs = useCallback(async (activeFilters, activePage) => {
-    setLoading(true);
-    setError("");
-    try {
-      const payload = {
-        skip: (activePage - 1) * PAGE_SIZE,
-        limit: PAGE_SIZE,
-        search: activeFilters.search,
-        dateFrom: activeFilters.dateFrom,
-        dateTo: activeFilters.dateTo,
-        nodeId: activeFilters.nodeId ? Number(activeFilters.nodeId) : null,
-        level: activeFilters.level === "ALL" ? null : activeFilters.level,
-      };
-
-      const [rows, count] = await Promise.all([getLogs(payload), getLogsCount(payload)]);
-      setLogs(Array.isArray(rows) ? rows : []);
-      setTotal(Number(count?.total || 0));
-    } catch (err) {
-      setError(err.message || t("Error al cargar los logs"));
-      setLogs([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
 
   useEffect(() => {
     let mounted = true;
     getDeviceNodes()
       .then((rows) => {
-        if (!mounted) return;
-        setNodes(Array.isArray(rows) ? rows : []);
+        if (mounted) setNodes(Array.isArray(rows) ? rows : []);
       })
       .catch(() => {
         if (mounted) setNodes([]);
       });
+
     return () => {
       mounted = false;
     };
   }, []);
 
   useEffect(() => {
-    loadLogs(filters, page);
-  }, [filters, page, loadLogs]);
+    const currentRequest = requestIdRef.current + 1;
+    requestIdRef.current = currentRequest;
+    setLoading(true);
+    setError("");
+
+    Promise.all([
+      getLogs({
+        skip: (page - 1) * PAGE_SIZE,
+        limit: PAGE_SIZE,
+        search: activeFilters.search,
+        dateFrom: activeFilters.dateFrom,
+        dateTo: activeFilters.dateTo,
+        nodeId: activeFilters.nodeId ? Number(activeFilters.nodeId) : null,
+        level: activeFilters.level === "ALL" ? null : activeFilters.level,
+      }),
+      getLogsCount({
+        search: activeFilters.search,
+        dateFrom: activeFilters.dateFrom,
+        dateTo: activeFilters.dateTo,
+        nodeId: activeFilters.nodeId ? Number(activeFilters.nodeId) : null,
+        level: activeFilters.level === "ALL" ? null : activeFilters.level,
+      }),
+      getLogsStats({
+        search: activeFilters.search,
+        dateFrom: activeFilters.dateFrom,
+        dateTo: activeFilters.dateTo,
+        nodeId: activeFilters.nodeId ? Number(activeFilters.nodeId) : null,
+        level: activeFilters.level === "ALL" ? null : activeFilters.level,
+      }),
+    ])
+      .then(([rows, count, stats]) => {
+        if (requestIdRef.current !== currentRequest) return;
+        setLogs(Array.isArray(rows) ? rows : []);
+        setTotal(Number(count?.total || 0));
+        setCriticalLast24h(Number(stats?.critical_last_24h || 0));
+      })
+      .catch((err) => {
+        if (requestIdRef.current !== currentRequest) return;
+        setLogs([]);
+        setTotal(0);
+        setCriticalLast24h(0);
+        setError(err?.message || t("Error al cargar los logs"));
+      })
+      .finally(() => {
+        if (requestIdRef.current === currentRequest) {
+          setLoading(false);
+        }
+      });
+  }, [activeFilters, page, refreshTick, t]);
 
   useEffect(() => {
-    const unsubscribe = appSocket.subscribe("logs.new", async () => {
-      await loadLogs(filters, page);
-      if (autoScroll && tableWrapRef.current) {
-        tableWrapRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    const unsubscribe = appSocket.subscribe("logs.new", (incoming) => {
+      if (!incoming || !matchesFilters(incoming, activeFilters)) return;
+
+      setTotal((prev) => prev + 1);
+      if (String(incoming.level || "").toUpperCase() === "CRITICAL") {
+        setCriticalLast24h((prev) => prev + 1);
+      }
+
+      if (page === 1) {
+        setLogs((prev) => [incoming, ...prev.filter((item) => item.log_id !== incoming.log_id)].slice(0, PAGE_SIZE));
+        if (tableWrapRef.current) {
+          tableWrapRef.current.scrollTo({ top: 0, behavior: "smooth" });
+        }
       }
     });
+
     return () => unsubscribe();
-  }, [filters, page, autoScroll, loadLogs]);
+  }, [activeFilters, page]);
 
   useEffect(() => {
-    if (autoScroll && tableWrapRef.current) {
-      tableWrapRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    if (page > totalPages) {
+      setPage(totalPages);
     }
-  }, [logs, autoScroll]);
+  }, [page, totalPages]);
 
-  const activeFilterChips = useMemo(() => {
-    const chips = [];
-    if (filters.search) chips.push({ key: "search", label: `${t("Buscar")}: ${filters.search}` });
-    if (filters.dateFrom) chips.push({ key: "dateFrom", label: `${t("Desde")}: ${filters.dateFrom}` });
-    if (filters.dateTo) chips.push({ key: "dateTo", label: `${t("Hasta")}: ${filters.dateTo}` });
-    if (filters.nodeId) chips.push({ key: "nodeId", label: `${t("Nodo")}: ${filters.nodeId}` });
-    if (filters.level && filters.level !== "ALL") {
-      chips.push({ key: "level", label: `${t("Tipo")}: ${filters.level}` });
-    }
-    return chips;
-  }, [filters, t]);
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.search.trim()) count += 1;
+    if (filters.dateFrom) count += 1;
+    if (filters.dateTo) count += 1;
+    if (filters.nodeId) count += 1;
+    if (filters.level !== "ALL") count += 1;
+    return count;
+  }, [filters]);
 
-  function applyFilters() {
-    setFilters(draftFilters);
+  function updateFilter(key, value) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1);
-    setFiltersOpen(false);
   }
 
-  function clearAllFilters() {
-    setDraftFilters(EMPTY_FILTERS);
+  function clearFilters() {
     setFilters(EMPTY_FILTERS);
     setPage(1);
   }
 
-  function removeFilter(filterKey) {
-    const next = { ...filters, [filterKey]: EMPTY_FILTERS[filterKey] };
-    setFilters(next);
-    setDraftFilters(next);
-    setPage(1);
+  async function handleDeleteRow(logId) {
+    const confirmed = window.confirm(t("Confirmar eliminacion de log"));
+    if (!confirmed) return;
+
+    setActionLoading(`delete-${logId}`);
+    setError("");
+
+    try {
+      await appSocket.request("logs.delete", { log_id: logId });
+      setRefreshTick((prev) => prev + 1);
+    } catch (err) {
+      setError(err?.message || t("Error al eliminar logs"));
+    } finally {
+      setActionLoading("");
+    }
   }
 
-  function formatDate(value) {
-    if (!value) return "-";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "-";
-    return d.toLocaleDateString("es-AR");
+  async function handleClearLogs() {
+    const hasFilters = activeFilterCount > 0;
+    const confirmed = window.confirm(
+      hasFilters ? t("Confirmar eliminacion filtrada") : t("Confirmar eliminacion total"),
+    );
+    if (!confirmed) return;
+
+    setActionLoading("clear");
+    setError("");
+
+    try {
+      await deleteLogsBulk({
+        nodeId: activeFilters.nodeId ? Number(activeFilters.nodeId) : null,
+        level: activeFilters.level === "ALL" ? null : activeFilters.level,
+        search: activeFilters.search,
+        dateFrom: activeFilters.dateFrom,
+        dateTo: activeFilters.dateTo,
+        confirmAll: !hasFilters,
+      });
+      setPage(1);
+      setRefreshTick((prev) => prev + 1);
+    } catch (err) {
+      setError(err?.message || t("Error al eliminar logs"));
+    } finally {
+      setActionLoading("");
+    }
   }
 
-  function formatTime(value) {
-    if (!value) return "-";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "-";
-    return d.toLocaleTimeString("es-AR", { hour12: false });
+  async function handleExport(format) {
+    setActionLoading(`export-${format}`);
+    setError("");
+
+    try {
+      const { blob, filename } = await exportLogs({
+        format,
+        nodeId: activeFilters.nodeId ? Number(activeFilters.nodeId) : null,
+        level: activeFilters.level === "ALL" ? null : activeFilters.level,
+        search: activeFilters.search,
+        dateFrom: activeFilters.dateFrom,
+        dateTo: activeFilters.dateTo,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = buildExportName(filename, `logs-export.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.message || t("Error al exportar logs"));
+    } finally {
+      setActionLoading("");
+    }
   }
 
   return (
-    <div className="panel-page">
-      <div className="panel-heading-row">
-        <div>
-          <span className="section-kicker">Telemetry Logs</span>
+    <div className="panel-page logs-archive-page">
+      <section className="logs-archive-hero app-data-card">
+        <div className="logs-archive-hero__copy">
+          <span className="section-kicker logs-archive-kicker">{t("Archivo del sistema")}</span>
           <h2>{t("Log de Paquetes")}</h2>
-          <p>{t("Registros cronologicos (mas reciente primero)")}</p>
+          <div className="logs-archive-stats">
+            <div className="logs-archive-statline">
+              <span>{t("Total records")}</span>
+              <strong>{total.toLocaleString(language === "en" ? "en-US" : "es-AR")}</strong>
+            </div>
+            <div className="logs-archive-statline">
+              <span>{t("Critical events (24h)")}</span>
+              <strong>{criticalLast24h.toLocaleString(language === "en" ? "en-US" : "es-AR")}</strong>
+            </div>
+          </div>
         </div>
-        <div className="logs-actions-row">
-          <button
-            className={`btn-muted log-filter-toggle ${activeFilterChips.length ? "active" : ""}`}
-            type="button"
-            onClick={() => setFiltersOpen((prev) => !prev)}
-            aria-label={t("Filtros")}
-          >
-            <span className="material-symbols-outlined">filter_alt</span>
-            <span>{t("Filtros")}</span>
-            {activeFilterChips.length > 0 && <span className="filter-badge">{activeFilterChips.length}</span>}
-          </button>
 
-          <label className="log-autoscroll-label">
+        <div className="logs-archive-toolbar">
+          <button
+            type="button"
+            className="btn-muted logs-archive-toolbar__button"
+            onClick={() => handleExport("csv")}
+            disabled={actionLoading === "export-csv"}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">download</span>
+            <span>CSV</span>
+          </button>
+          <button
+            type="button"
+            className="btn-muted logs-archive-toolbar__button"
+            onClick={() => handleExport("json")}
+            disabled={actionLoading === "export-json"}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">code</span>
+            <span>JSON</span>
+          </button>
+          <button
+            type="button"
+            className="btn-outline logs-archive-toolbar__button logs-archive-toolbar__button--danger"
+            onClick={handleClearLogs}
+            disabled={actionLoading === "clear"}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">delete_sweep</span>
+            <span>{t("Clear Logs")}</span>
+          </button>
+        </div>
+      </section>
+
+      <section className="logs-archive-filters app-form-panel">
+        <div className="logs-archive-filters__grid">
+          <label>
+            <span>{t("Buscar")}</span>
             <input
-              type="checkbox"
-              checked={autoScroll}
-              onChange={(e) => setAutoScroll(e.target.checked)}
+              type="text"
+              value={filters.search}
+              onChange={(event) => updateFilter("search", event.target.value)}
+              placeholder={t("Buscar mensaje")}
             />
-            {t("Auto-scroll")}
+          </label>
+          <label>
+            <span>{t("Nodo")}</span>
+            <select
+              value={filters.nodeId}
+              onChange={(event) => updateFilter("nodeId", event.target.value)}
+            >
+              <option value="">{t("Todos los nodos")}</option>
+              {nodes.map((node) => (
+                <option key={node.node_id} value={String(node.node_id)}>
+                  {`N${node.node_id} - ${node.model}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{t("Tipo")}</span>
+            <select
+              value={filters.level}
+              onChange={(event) => updateFilter("level", event.target.value)}
+            >
+              {LEVEL_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === "ALL" ? t("Todos los niveles") : option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{t("Desde")}</span>
+            <input
+              type="date"
+              value={filters.dateFrom}
+              onChange={(event) => updateFilter("dateFrom", event.target.value)}
+            />
+          </label>
+          <label>
+            <span>{t("Hasta")}</span>
+            <input
+              type="date"
+              value={filters.dateTo}
+              onChange={(event) => updateFilter("dateTo", event.target.value)}
+            />
           </label>
         </div>
-      </div>
 
-      {filtersOpen && (
-        <div className="form-card app-form-panel logs-filter-panel">
-          <div className="logs-filter-grid">
-            <label>
-              {t("Buscar")}
-              <input
-                type="text"
-                value={draftFilters.search}
-                onChange={(e) => setDraftFilters((prev) => ({ ...prev, search: e.target.value }))}
-                placeholder={t("Buscar observacion")}
-              />
-            </label>
-            <label>
-              {t("Desde")}
-              <input
-                type="date"
-                value={draftFilters.dateFrom}
-                onChange={(e) => setDraftFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
-              />
-            </label>
-            <label>
-              {t("Hasta")}
-              <input
-                type="date"
-                value={draftFilters.dateTo}
-                onChange={(e) => setDraftFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
-              />
-            </label>
-            <label>
-              {t("Nodo")}
-              <select
-                value={draftFilters.nodeId}
-                onChange={(e) => setDraftFilters((prev) => ({ ...prev, nodeId: e.target.value }))}
-              >
-                <option value="">{t("Todos")}</option>
-                {nodes.map((node) => (
-                  <option key={node.node_id} value={String(node.node_id)}>
-                    {`N${node.node_id} - ${node.model}`}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {t("Tipo")}
-              <select
-                value={draftFilters.level}
-                onChange={(e) => setDraftFilters((prev) => ({ ...prev, level: e.target.value }))}
-              >
-                {LEVEL_OPTIONS.map((level) => (
-                  <option key={level} value={level}>{level}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="form-actions">
-            <button className="btn-primary" type="button" onClick={applyFilters}>{t("Aplicar")}</button>
-            <button className="btn-muted" type="button" onClick={clearAllFilters}>{t("Limpiar todos")}</button>
-          </div>
-        </div>
-      )}
-
-      {activeFilterChips.length > 0 && (
-        <div className="logs-active-filters">
-          {activeFilterChips.map((chip) => (
-            <button
-              key={chip.key}
-              className="active-filter-chip"
-              type="button"
-              onClick={() => removeFilter(chip.key)}
-              title={t("Quitar filtro")}
-            >
-              <span>{chip.label}</span>
-              <span className="material-symbols-outlined">close</span>
-            </button>
-          ))}
-          <button className="btn-outline logs-clear-all" type="button" onClick={clearAllFilters}>
+        <div className="logs-archive-filters__meta">
+          <span>
+            {t("Filtros activos")}: {activeFilterCount}
+          </span>
+          <button type="button" className="btn-muted logs-archive-reset" onClick={clearFilters}>
             {t("Limpiar todos")}
           </button>
         </div>
-      )}
+      </section>
 
       {error && <div className="error-box">{error}</div>}
 
-      <div className="table-card app-data-card">
-        <div className="table-header">
-          <h3>{t("Registros")}</h3>
-          <span>{total} {t("entradas")}</span>
+      <section className="table-card app-data-card logs-archive-table-card">
+        <div className="table-header logs-archive-table-card__header">
+          <div>
+            <h3>{t("Registros")}</h3>
+            <p>{t("Historial de eventos sincronizado por websocket.")}</p>
+          </div>
+          <span>{t("Pagina")} {page} / {totalPages}</span>
         </div>
 
-        <div className="logs-table-wrap" ref={tableWrapRef}>
-          <table>
+        <div className="logs-table-wrap logs-archive-table-wrap" ref={tableWrapRef}>
+          <table className="logs-archive-table">
             <thead>
               <tr>
-                <th>{t("Fecha")}</th>
-                <th>{t("Hora")}</th>
+                <th>{t("Timestamp")}</th>
                 <th>{t("Nodo")}</th>
                 <th>{t("Tipo")}</th>
-                <th>{t("Observacion")}</th>
+                <th>{t("Mensaje de log")}</th>
+                <th>{t("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -287,18 +440,35 @@ export default function PacketLogsPage() {
                 </tr>
               ) : (
                 logs.map((log) => {
-                  const ts = log.created_at || log.timestamp;
+                  const { date, time } = formatDateTime(getTimestamp(log), language === "en" ? "en-US" : "es-AR");
+                  const level = String(log.level || "").toUpperCase();
+                  const tone = LEVEL_TONE[level] || "debug";
+
                   return (
                     <tr key={log.log_id}>
-                      <td>{formatDate(ts)}</td>
-                      <td>{formatTime(ts)}</td>
-                      <td>{`N${log.node_id}`}</td>
+                      <td className="logs-archive-table__timestamp">
+                        <span>{date}</span>
+                        <strong>{time}</strong>
+                      </td>
+                      <td className="logs-archive-table__node">{`N${log.node_id}`}</td>
                       <td>
-                        <span className="log-level-pill" style={{ color: LEVEL_COLORS[log.level] || "var(--text-muted)" }}>
-                          {log.level}
+                        <span className={`logs-archive-level logs-archive-level--${tone}`}>
+                          {level}
                         </span>
                       </td>
-                      <td>{log.message}</td>
+                      <td className="logs-archive-table__message">{log.message}</td>
+                      <td className="logs-archive-table__actions">
+                        <button
+                          type="button"
+                          className="logs-row-action"
+                          onClick={() => handleDeleteRow(log.log_id)}
+                          disabled={actionLoading === `delete-${log.log_id}`}
+                          aria-label={t("Eliminar")}
+                          title={t("Eliminar")}
+                        >
+                          <span className="material-symbols-outlined" aria-hidden="true">delete</span>
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
@@ -307,26 +477,31 @@ export default function PacketLogsPage() {
           </table>
         </div>
 
-        <div className="logs-pagination">
-          <button
-            className="btn-muted"
-            type="button"
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            disabled={page <= 1 || loading}
-          >
-            {t("Anterior")}
-          </button>
-          <span>{t("Pagina")} {page} / {Math.max(1, totalPages)}</span>
-          <button
-            className="btn-muted"
-            type="button"
-            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-            disabled={page >= totalPages || loading}
-          >
-            {t("Siguiente")}
-          </button>
+        <div className="logs-archive-pagination">
+          <div className="logs-archive-pagination__summary">
+            {loading ? t("Actualizando...") : `${t("Mostrando")} ${logs.length} / ${total.toLocaleString(language === "en" ? "en-US" : "es-AR")}`}
+          </div>
+          <div className="logs-archive-pagination__controls">
+            <button
+              type="button"
+              className="btn-muted"
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={loading || page <= 1}
+            >
+              {t("Anterior")}
+            </button>
+            <span className="logs-archive-pagination__current">{page}</span>
+            <button
+              type="button"
+              className="btn-muted"
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={loading || page >= totalPages}
+            >
+              {t("Siguiente")}
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

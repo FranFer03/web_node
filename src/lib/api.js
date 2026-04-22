@@ -37,6 +37,55 @@ async function httpRequest(path, options = {}) {
   return data;
 }
 
+async function rawHttpRequest(path, options = {}) {
+  const { token } = getAuthState();
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "GET",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      data = undefined;
+    }
+    throw new Error(buildErrorMessage(response.status, data));
+  }
+
+  return response;
+}
+
+function buildLogsQuery({
+  skip,
+  limit,
+  nodeId,
+  level,
+  search,
+  dateFrom,
+  dateTo,
+  confirmAll,
+  format,
+} = {}) {
+  const params = new URLSearchParams();
+  if (Number.isFinite(skip)) params.set("skip", String(skip));
+  if (Number.isFinite(limit)) params.set("limit", String(limit));
+  if (nodeId !== null && nodeId !== undefined && nodeId !== "") params.set("node_id", String(nodeId));
+  if (level) params.set("level", String(level));
+  if (search) params.set("search", String(search));
+  if (dateFrom) params.set("date_from", String(dateFrom));
+  if (dateTo) params.set("date_to", String(dateTo));
+  if (confirmAll) params.set("confirm_all", "true");
+  if (format) params.set("format", String(format));
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
 export async function loginUser(usuario, contrasena) {
   return httpRequest("/users/login", {
     method: "POST",
@@ -268,6 +317,72 @@ export async function getLogsCount({
     date_from: dateFrom || null,
     date_to: dateTo || null,
   });
+}
+
+export async function getLogsStats({
+  nodeId = null,
+  level = null,
+  search = "",
+  dateFrom = "",
+  dateTo = "",
+} = {}) {
+  return appSocket.request("logs.stats", {
+    node_id: nodeId,
+    level,
+    search: search || null,
+    date_from: dateFrom || null,
+    date_to: dateTo || null,
+  });
+}
+
+export async function deleteLogsBulk({
+  nodeId = null,
+  level = null,
+  search = "",
+  dateFrom = "",
+  dateTo = "",
+  confirmAll = false,
+} = {}) {
+  return rawHttpRequest(
+    `/logs${buildLogsQuery({
+      nodeId,
+      level,
+      search,
+      dateFrom,
+      dateTo,
+      confirmAll,
+    })}`,
+    { method: "DELETE" },
+  ).then((response) => response.json());
+}
+
+export async function exportLogs({
+  format = "csv",
+  nodeId = null,
+  level = null,
+  search = "",
+  dateFrom = "",
+  dateTo = "",
+} = {}) {
+  const response = await rawHttpRequest(
+    `/logs/export${buildLogsQuery({
+      format,
+      nodeId,
+      level,
+      search,
+      dateFrom,
+      dateTo,
+    })}`,
+  );
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get("content-disposition") || "";
+  const filenameMatch = /filename=\"?([^"]+)\"?/i.exec(contentDisposition);
+
+  return {
+    blob,
+    filename: filenameMatch?.[1] || `logs-export.${format}`,
+  };
 }
 
 export { API_BASE_URL };

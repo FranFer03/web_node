@@ -442,6 +442,9 @@ Obtiene logs con paginación y filtros opcionales.
 | `limit` | `int` | `100` | Máx registros (máx `1000`) |
 | `node_id` | `int` | — | Filtrar por nodo |
 | `level` | `string` | — | Filtrar por nivel de log |
+| `search` | `string` | — | Buscar por mensaje o ID de nodo |
+| `date_from` | `string` | — | Fecha mínima (`YYYY-MM-DD`) |
+| `date_to` | `string` | — | Fecha máxima (`YYYY-MM-DD`) |
 
 **Ejemplo:** `GET /logs?skip=0&limit=50&node_id=3&level=ERROR`
 
@@ -468,12 +471,42 @@ Obtiene el total de logs (útil para paginación).
 
 **Rate limit:** 60/minuto
 
-**Query params:** `node_id` (opcional), `level` (opcional)
+**Query params:** `node_id` (opcional), `level` (opcional), `search` (opcional), `date_from` (opcional), `date_to` (opcional)
 
 **Response `200 OK`:**
 ```json
 { "total": 247 }
 ```
+
+---
+
+### GET `/logs/stats`
+
+Obtiene métricas agregadas para la vista de archive.
+
+**Rate limit:** 60/minuto
+
+**Query params:** `node_id` (opcional), `level` (opcional), `search` (opcional), `date_from` (opcional), `date_to` (opcional)
+
+**Response `200 OK`:**
+```json
+{
+  "total": 247,
+  "critical_last_24h": 12
+}
+```
+
+---
+
+### GET `/logs/export`
+
+Exporta logs filtrados en `csv` o `json`.
+
+**Rate limit:** 30/minuto
+
+**Query params:** `format` (`csv` o `json`), `node_id` (opcional), `level` (opcional), `search` (opcional), `date_from` (opcional), `date_to` (opcional)
+
+**Response `200 OK`:** archivo descargable
 
 ---
 
@@ -534,6 +567,21 @@ Elimina un log.
 **Response `200 OK`:**
 ```json
 { "message": "Log deleted successfully" }
+```
+
+---
+
+### DELETE `/logs`
+
+Elimina logs en bloque.
+
+**Rate limit:** 5/minuto
+
+**Query params:** `node_id` (opcional), `level` (opcional), `search` (opcional), `date_from` (opcional), `date_to` (opcional), `confirm_all` (`true` requerido si no se envía ningún filtro)
+
+**Response `200 OK`:**
+```json
+{ "deleted": 37 }
 ```
 
 ---
