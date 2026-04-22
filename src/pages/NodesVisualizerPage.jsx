@@ -1,166 +1,552 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { getDeviceNodes, getMeasurements } from "../lib/api";
+import "leaflet/dist/leaflet.css";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import L from "leaflet";
+
+import { getLatestMeasurementsByNode, getLogs, updateDeviceNode } from "../lib/api";
+import { appSocket } from "../lib/appSocket";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 
-const POLL_INTERVAL_MS = 30000;
+const COVERAGE_RADIUS_METERS = 1000;
+const LOG_LIMIT = 5;
+const DEFAULT_CENTER = [-34.6037, -58.3816];
+const DEFAULT_ZOOM = 10;
+const DETAIL_ZOOM = 15;
+const MIN_INTERVAL_MINUTES = 1;
+const MAX_INTERVAL_MINUTES = 60;
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatLogTime(value) {
+  if (!value) return "--:--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--:--";
+  return date.toLocaleTimeString("es-AR", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function sortSnapshots(rows) {
+  return [...rows].sort((a, b) => {
+    if (a.status === "active" && b.status !== "active") return -1;
+    if (a.status !== "active" && b.status === "active") return 1;
+    return Number(a.node_id) - Number(b.node_id);
+  });
+}
+
+function getMetricValue(metric, fractionDigits = 1) {
+  if (!metric || typeof metric.value !== "number") return "-";
+  return metric.value.toFixed(fractionDigits);
+}
+
+function toIntervalMinutes(refreshRate) {
+  const parsed = Number(refreshRate);
+  if (!Number.isFinite(parsed) || parsed <= 0) return MIN_INTERVAL_MINUTES;
+  return Math.min(MAX_INTERVAL_MINUTES, Math.max(MIN_INTERVAL_MINUTES, Math.round(parsed / 60)));
+}
+
+function toRefreshRateSeconds(minutes) {
+  const parsed = Number(minutes);
+  if (!Number.isFinite(parsed) || parsed <= 0) return MIN_INTERVAL_MINUTES * 60;
+  return Math.round(parsed) * 60;
+}
+
+function buildNodeIcon(snapshot, isSelected) {
+  const statusClass = snapshot.status === "active" ? "active" : "muted";
+  const selectedClass = isSelected ? " selected" : "";
+
+  return L.divIcon({
+    className: "realtime-node-icon-wrapper",
+    html: `<span class="realtime-node-icon ${statusClass}${selectedClass}"></span>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
 
 export default function NodesVisualizerPage() {
   const { t } = useThemeLang();
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
+  const overlaysRef = useRef(null);
+  const mapTouchedRef = useRef(false);
+  const selectedNodeIdRef = useRef(null);
+
   const [nodes, setNodes] = useState([]);
-  const [measurementsByNode, setMeasurementsByNode] = useState({});
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const pollTimer = useRef(null);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [logsError, setLogsError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [powerSaving, setPowerSaving] = useState(false);
+  const [intervalSaving, setIntervalSaving] = useState(false);
+  const [intervalMinutes, setIntervalMinutes] = useState(MIN_INTERVAL_MINUTES);
 
-  const fetchData = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
+  const nodesById = useMemo(() => {
+    const map = new Map();
+    for (const node of nodes) {
+      map.set(node.node_id, node);
+    }
+    return map;
+  }, [nodes]);
+
+  const selectedNode = selectedNodeId ? nodesById.get(selectedNodeId) || null : null;
+
+  useEffect(() => {
+    selectedNodeIdRef.current = selectedNodeId;
+  }, [selectedNodeId]);
+
+  const visibleNodes = useMemo(() => {
+    return nodes.filter((node) => {
+      const lat = node?.coordinates?.lat;
+      const lng = node?.coordinates?.lng;
+      return Number.isFinite(lat) && Number.isFinite(lng);
+    });
+  }, [nodes]);
+
+  const activeVisibleCount = useMemo(() => {
+    return visibleNodes.filter((node) => node.status === "active").length;
+  }, [visibleNodes]);
+
+  async function loadSnapshot() {
     try {
-      const [nodesData, measurementsData] = await Promise.all([
-        getDeviceNodes(),
-        getMeasurements(),
-      ]);
-
-      const parsedNodes = Array.isArray(nodesData) ? [...nodesData] : [];
-      parsedNodes.sort((a, b) => {
-        if (a.status === "active" && b.status !== "active") return -1;
-        if (a.status !== "active" && b.status === "active") return 1;
-        return 0;
-      });
-      setNodes(parsedNodes);
-
-      const grouped = {};
-      if (Array.isArray(measurementsData)) {
-        const sorted = [...measurementsData].sort(
-          (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
-        );
-        for (const m of sorted) {
-          if (!grouped[m.node_id]) grouped[m.node_id] = {};
-          grouped[m.node_id][m.sensor_type_id] = m;
-        }
-      }
-      setMeasurementsByNode(grouped);
-      setLastUpdated(new Date());
+      setError("");
+      const rows = await getLatestMeasurementsByNode();
+      setNodes(sortSnapshots(Array.isArray(rows) ? rows : []));
     } catch (err) {
       setError(err.message || t("Error al cargar los datos"));
+      setNodes([]);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }
+
+  async function loadNodeLogs(nodeId) {
+    setLogsLoading(true);
+    setLogsError("");
+    try {
+      const rows = await getLogs({ nodeId, limit: LOG_LIMIT });
+      setLogs(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      setLogsError(err.message || t("Error al cargar los logs"));
+      setLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  }
+
+  function mergeRealtimeSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot.node_id !== "number") return;
+    setNodes((prev) => {
+      const existingIndex = prev.findIndex((node) => node.node_id === snapshot.node_id);
+      if (existingIndex === -1) return sortSnapshots([...prev, snapshot]);
+      const next = [...prev];
+      next[existingIndex] = snapshot;
+      return sortSnapshots(next);
+    });
+  }
 
   useEffect(() => {
-    fetchData();
-    pollTimer.current = setInterval(() => fetchData(true), POLL_INTERVAL_MS);
-    return () => clearInterval(pollTimer.current);
-  }, [fetchData]);
+    loadSnapshot();
+
+    const unsubRealtime = appSocket.subscribe("measurements.realtime.updated", (snapshot) => {
+      mergeRealtimeSnapshot(snapshot);
+    });
+
+    const unsubNodes = appSocket.subscribe("nodes.changed", async (event) => {
+      if (event?.action === "delete" && event?.data?.node_id === selectedNodeIdRef.current) {
+        setSelectedNodeId(null);
+      }
+      await loadSnapshot();
+    });
+
+    return () => {
+      unsubRealtime();
+      unsubNodes();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedNode) {
+      setLogs([]);
+      setLogsError("");
+      return;
+    }
+    setIntervalMinutes(toIntervalMinutes(selectedNode.refresh_rate));
+    loadNodeLogs(selectedNode.node_id);
+  }, [selectedNode?.node_id]);
+
+  useEffect(() => {
+    if (!selectedNode) return;
+    setIntervalMinutes(toIntervalMinutes(selectedNode.refresh_rate));
+  }, [selectedNode?.refresh_rate]);
+
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return undefined;
+
+    const map = L.map(mapContainerRef.current, {
+      zoomControl: false,
+      attributionControl: true,
+    }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 19,
+        attribution: "Tiles (c) Esri",
+      }
+    ).addTo(map);
+
+    overlaysRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+
+    const markTouched = () => {
+      mapTouchedRef.current = true;
+    };
+
+    map.on("dragstart", markTouched);
+    map.on("zoomstart", markTouched);
+
+    return () => {
+      map.off("dragstart", markTouched);
+      map.off("zoomstart", markTouched);
+      map.remove();
+      mapRef.current = null;
+      overlaysRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapRef.current || !overlaysRef.current) return;
+
+    overlaysRef.current.clearLayers();
+
+    if (visibleNodes.length === 0) {
+      mapRef.current.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      return;
+    }
+
+    const bounds = [];
+
+    for (const node of visibleNodes) {
+      const { lat, lng } = node.coordinates;
+      const latLng = [lat, lng];
+      bounds.push(latLng);
+
+      if (node.status === "active") {
+        L.circle(latLng, {
+          radius: COVERAGE_RADIUS_METERS,
+          className: "realtime-coverage-circle",
+          color: "#ff7a1a",
+          fillColor: "#ff7a1a",
+          fillOpacity: 0.16,
+          opacity: 0.18,
+          weight: 1,
+        }).addTo(overlaysRef.current);
+      }
+
+      const marker = L.marker(latLng, {
+        icon: buildNodeIcon(node, node.node_id === selectedNodeId),
+        title: node.model,
+      }).addTo(overlaysRef.current);
+
+      marker.bindTooltip(node.model, {
+        direction: "top",
+        offset: [0, -12],
+        className: "realtime-node-tooltip",
+      });
+
+      marker.on("click", () => {
+        setSelectedNodeId(node.node_id);
+      });
+    }
+
+    if (selectedNode?.coordinates) {
+      mapRef.current.flyTo(
+        [selectedNode.coordinates.lat, selectedNode.coordinates.lng],
+        Math.max(mapRef.current.getZoom(), DETAIL_ZOOM),
+        { duration: 0.45 }
+      );
+      return;
+    }
+
+    if (!mapTouchedRef.current) {
+      mapRef.current.fitBounds(bounds, {
+        padding: [48, 48],
+        maxZoom: 13,
+      });
+    }
+  }, [visibleNodes, selectedNodeId, selectedNode]);
+
+  async function handleTogglePower() {
+    if (!selectedNode || powerSaving) return;
+    const nextStatus = selectedNode.status === "active" ? "inactive" : "active";
+
+    try {
+      setPowerSaving(true);
+      setActionMessage("");
+      await updateDeviceNode(selectedNode.node_id, { status: nextStatus });
+      setNodes((prev) =>
+        sortSnapshots(
+          prev.map((node) =>
+            node.node_id === selectedNode.node_id ? { ...node, status: nextStatus } : node
+          )
+        )
+      );
+      setActionMessage(
+        nextStatus === "active"
+          ? t("Nodo activado correctamente.")
+          : t("Nodo desactivado correctamente.")
+      );
+    } catch (err) {
+      setError(err.message || t("Error al cargar los datos"));
+    } finally {
+      setPowerSaving(false);
+    }
+  }
+
+  async function handleIntervalCommit() {
+    if (!selectedNode || intervalSaving) return;
+    const nextSeconds = toRefreshRateSeconds(intervalMinutes);
+    if (nextSeconds === selectedNode.refresh_rate) return;
+
+    try {
+      setIntervalSaving(true);
+      setActionMessage("");
+      await updateDeviceNode(selectedNode.node_id, { refresh_rate: nextSeconds });
+      setNodes((prev) =>
+        sortSnapshots(
+          prev.map((node) =>
+            node.node_id === selectedNode.node_id
+              ? { ...node, refresh_rate: nextSeconds }
+              : node
+          )
+        )
+      );
+      setActionMessage(t("Intervalo actualizado."));
+    } catch (err) {
+      setError(err.message || t("Error al cargar los datos"));
+    } finally {
+      setIntervalSaving(false);
+    }
+  }
+
+  function handleZoomIn() {
+    mapRef.current?.zoomIn();
+  }
+
+  function handleZoomOut() {
+    mapRef.current?.zoomOut();
+  }
+
+  function handleResetView() {
+    mapTouchedRef.current = false;
+    if (!mapRef.current) return;
+    if (visibleNodes.length === 0) {
+      mapRef.current.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      return;
+    }
+    mapRef.current.fitBounds(
+      visibleNodes.map((node) => [node.coordinates.lat, node.coordinates.lng]),
+      { padding: [48, 48], maxZoom: 13 }
+    );
+  }
+
+  const statusLabel =
+    selectedNode?.status === "active"
+      ? t("Active")
+      : selectedNode?.status === "maintenance"
+      ? t("Mantenimiento")
+      : t("Offline");
 
   return (
-    <div className="panel-page">
+    <div className="panel-page realtime-page">
       <div className="panel-heading-row">
         <div>
           <span className="section-kicker">Live Monitoring</span>
-          <h2>{t("Live Node Grid")}</h2>
-          <p>
-            {t("Real-time telemetry from mesh nodes")}
-            {lastUpdated && (
-              <span className="last-updated">
-                {" — "}{t("Actualizado")}: {lastUpdated.toLocaleTimeString()}
-              </span>
-            )}
-          </p>
+          <h2>{t("Tiempo real")}</h2>
+          <p>{t("Monitoreo en vivo sobre mapa satelital.")}</p>
         </div>
       </div>
 
-      {loading && (
-        <div className="analytics-card">
-          <span className="material-symbols-outlined">data_usage</span>
-          <p>{t("Cargando nodos...")}</p>
-        </div>
-      )}
-      {error && <p className="error-box">{error}</p>}
+      {error && <div className="error-box">{error}</div>}
+      {actionMessage && <div className="success-box">{actionMessage}</div>}
 
-      {!loading && !error && (
-        <div className="node-grid">
-          {nodes.length === 0 ? (
-            <p>{t("No hay nodos disponibles.")}</p>
-          ) : (
-            nodes.map((node) => {
-              const m = measurementsByNode[node.node_id] || {};
-              const temp = m[1] ? `${Number(m[1].value).toFixed(1)}°C` : "-";
-              const humid = m[2] ? `${Number(m[2].value).toFixed(1)}%` : "-";
-              const press = m[3] ? `${Number(m[3].value).toFixed(1)} hPa` : "-";
-              const latVal = m[4] ? Number(m[4].value) : null;
-              const lngVal = m[5] ? Number(m[5].value) : null;
-              const lat = latVal !== null ? `${latVal.toFixed(4)}°` : "-";
-              const lng = lngVal !== null ? `${lngVal.toFixed(4)}°` : "-";
-              const hasLocation = latVal !== null && lngVal !== null;
-              const isOffline = node.status !== "active";
+      <div className="realtime-layout">
+        <section className="realtime-map-shell table-card app-data-card">
+          <div className="realtime-summary-card">
+            <span className="section-kicker section-kicker--sidebar">{t("Cobertura activa")}</span>
+            <div className="realtime-summary-row">
+              <div>
+                <small>{t("Nodos visibles")}</small>
+                <strong>
+                  {activeVisibleCount}/{visibleNodes.length}
+                </strong>
+              </div>
+              <div>
+                <small>{t("Radio global")}</small>
+                <strong>1 km</strong>
+              </div>
+            </div>
+          </div>
 
-              return (
-                <article
-                  key={node.node_id}
-                  className={`node-card app-data-card ${isOffline ? "offline" : "active"}`}
-                >
-                  <header>
-                    <span className={`tag ${isOffline ? "gray" : "green"}`}>
-                      {isOffline ? t("Offline") : t("Active")}
-                    </span>
-                    <span className="tag">
-                      {t("Refresh")}: {node.refresh_rate}s
-                    </span>
-                  </header>
-                  <h3
-                    style={{
-                      textOverflow: "ellipsis",
-                      overflow: "hidden",
-                      whiteSpace: "nowrap",
-                    }}
-                    title={node.model}
-                  >
-                    {node.model}
-                  </h3>
-                  <p>ID: {node.node_id}</p>
-                  <div className="node-metrics">
-                    <div>
-                      <small>Temp</small>
-                      <strong>{temp}</strong>
-                    </div>
-                    <div>
-                      <small>Humid</small>
-                      <strong>{humid}</strong>
-                    </div>
-                    <div>
-                      <small>Press</small>
-                      <strong>{press}</strong>
-                    </div>
-                    <div>
-                      <small>Lat</small>
-                      <strong>{lat}</strong>
-                    </div>
-                    <div>
-                      <small>Lng</small>
-                      <strong>{lng}</strong>
-                    </div>
-                  </div>
+          <div ref={mapContainerRef} className="realtime-map-canvas" />
 
-                  {hasLocation && (
-                    <div style={{ marginTop: "15px" }}>
-                      <iframe
-                        title={`Mapa del nodo ${node.node_id}`}
-                        width="100%"
-                        height="150"
-                        style={{ border: 0, borderRadius: "8px" }}
-                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${lngVal - 0.005},${latVal - 0.005},${lngVal + 0.005},${latVal + 0.005}&layer=mapnik&marker=${latVal},${lngVal}`}
-                      />
-                    </div>
-                  )}
-                </article>
-              );
-            })
+          <div className="realtime-map-controls">
+            <button type="button" className="realtime-map-btn" onClick={handleZoomIn} aria-label={t("Acercar")}>
+              +
+            </button>
+            <button type="button" className="realtime-map-btn" onClick={handleZoomOut} aria-label={t("Alejar")}>
+              -
+            </button>
+            <button type="button" className="realtime-map-btn realtime-map-btn--stack" onClick={handleResetView} aria-label={t("Recentrar mapa")}>
+              <span className="material-symbols-outlined">layers</span>
+            </button>
+          </div>
+
+          {!loading && visibleNodes.length === 0 && (
+            <div className="realtime-map-empty">
+              <span className="material-symbols-outlined">satellite_alt</span>
+              <p>{t("No hay nodos con coordenadas para mostrar en el mapa.")}</p>
+            </div>
           )}
-        </div>
-      )}
+        </section>
+
+        <aside className="realtime-sidebar table-card app-data-card">
+          {!selectedNode ? (
+            <div className="realtime-empty-state">
+              <span className="material-symbols-outlined">orbital</span>
+              <h3>{t("Sin nodo seleccionado")}</h3>
+              <p>{t("Selecciona un nodo del mapa para ver su telemetria y controles.")}</p>
+            </div>
+          ) : (
+            <>
+              <div className="realtime-sidebar-header">
+                <div>
+                  <small>{selectedNode.model}</small>
+                  <h3>{`N${selectedNode.node_id}`}</h3>
+                </div>
+                <span className={`realtime-status-pill status-${selectedNode.status}`}>
+                  {statusLabel}
+                </span>
+              </div>
+
+              <div className="realtime-sidebar-section">
+                <div className="realtime-sidebar-section-head">
+                  <span className="section-kicker section-kicker--sidebar">{t("Telemetria ambiental")}</span>
+                  <span>{formatDateTime(selectedNode.latest_timestamp)}</span>
+                </div>
+
+                <div className="realtime-metric-stack">
+                  <article className="realtime-metric-card">
+                    <small>{t("Temperatura")}</small>
+                    <strong>
+                      {getMetricValue(selectedNode.metrics?.temperature)}
+                      <span>{selectedNode.metrics?.temperature?.unit || "°C"}</span>
+                    </strong>
+                  </article>
+                  <article className="realtime-metric-card">
+                    <small>{t("Humedad")}</small>
+                    <strong>
+                      {getMetricValue(selectedNode.metrics?.humidity)}
+                      <span>{selectedNode.metrics?.humidity?.unit || "%"}</span>
+                    </strong>
+                  </article>
+                  <article className="realtime-metric-card">
+                    <small>{t("Presion atmosferica")}</small>
+                    <strong>
+                      {getMetricValue(selectedNode.metrics?.pressure)}
+                      <span>{selectedNode.metrics?.pressure?.unit || "hPa"}</span>
+                    </strong>
+                  </article>
+                </div>
+              </div>
+
+              <div className="realtime-sidebar-section">
+                <div className="realtime-sidebar-section-head">
+                  <span className="section-kicker section-kicker--sidebar">{t("Logs tecnicos")}</span>
+                  <span>{LOG_LIMIT}</span>
+                </div>
+
+                {logsError ? (
+                  <div className="error-box">{logsError}</div>
+                ) : logsLoading ? (
+                  <div className="realtime-inline-placeholder">{t("Cargando logs...")}</div>
+                ) : logs.length === 0 ? (
+                  <div className="realtime-inline-placeholder">{t("No hay logs recientes para este nodo.")}</div>
+                ) : (
+                  <div className="realtime-log-list">
+                    {logs.map((log) => (
+                      <div key={log.log_id} className="realtime-log-item">
+                        <span>{formatLogTime(log.created_at || log.timestamp)}</span>
+                        <strong>{log.level}</strong>
+                        <p>{log.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="realtime-sidebar-section">
+                <div className="realtime-control-row">
+                  <div>
+                    <small>{t("Energia del nodo")}</small>
+                    <strong>{statusLabel}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    className={`realtime-power-toggle ${selectedNode.status === "active" ? "is-on" : ""}`}
+                    onClick={handleTogglePower}
+                    disabled={powerSaving}
+                    aria-label={t("Cambiar energia del nodo")}
+                  >
+                    <span className="realtime-power-toggle__knob" />
+                  </button>
+                </div>
+
+                <div className="realtime-slider-block">
+                  <div className="realtime-sidebar-section-head">
+                    <span className="section-kicker section-kicker--sidebar">{t("Transmission interval")}</span>
+                    <span>{intervalMinutes} min</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={MIN_INTERVAL_MINUTES}
+                    max={MAX_INTERVAL_MINUTES}
+                    step="1"
+                    value={intervalMinutes}
+                    onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+                    onMouseUp={handleIntervalCommit}
+                    onTouchEnd={handleIntervalCommit}
+                    onBlur={handleIntervalCommit}
+                    disabled={intervalSaving}
+                    className="realtime-slider"
+                  />
+                  <div className="realtime-slider-scale">
+                    <span>1 min</span>
+                    <span>60 min</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

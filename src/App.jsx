@@ -25,6 +25,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<HistoricalDashboardPage />} />
+              <Route path="/tiempo-real" element={<NodesVisualizerPage />} />
               <Route path="/nodes-visualizer" element={<NodesVisualizerPage />} />
               <Route path="/nodes-manager" element={<NodesManagerPage />} />
               <Route path="/packet-logs" element={<PacketLogsPage />} />

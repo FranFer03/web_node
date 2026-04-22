@@ -79,6 +79,10 @@ export async function getMeasurements() {
   return appSocket.request("measurements.list_recent");
 }
 
+export async function getLatestMeasurementsByNode() {
+  return appSocket.request("measurements.latest_by_node");
+}
+
 function filterByDateRange(rows, startDate, endDate) {
   const startTs = startDate ? new Date(`${startDate}T00:00:00`).getTime() : null;
   const endTs = endDate ? new Date(`${endDate}T23:59:59.999`).getTime() : null;

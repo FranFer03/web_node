@@ -37,6 +37,7 @@ export default function AppShell() {
 
   const navItems = [
     { to: "/dashboard", label: t("Dashboard"), icon: "bar_chart", subtitle: t("Historical") },
+    { to: "/tiempo-real", label: t("Tiempo real"), icon: "monitoring", subtitle: t("Monitoreo en vivo") },
     { to: "/nodes-visualizer", label: t("Panel de nodos"), icon: "map", subtitle: t("Informacion general de nodos") },
     { to: "/nodes-manager", label: t("Gestor de nodos"), icon: "settings_input_antenna", subtitle: t("Edit Node Configuration") },
     { to: "/packet-logs", label: t("Log de Paquetes"), icon: "terminal", subtitle: "Traffic analysis" },
@@ -49,12 +50,15 @@ export default function AppShell() {
 
   const isDashboardFamily =
     location.pathname.startsWith("/dashboard") ||
+    location.pathname.startsWith("/tiempo-real") ||
     location.pathname.startsWith("/nodes-visualizer") ||
     location.pathname.startsWith("/nodes-manager") ||
     location.pathname.startsWith("/packet-logs");
 
   const currentSectionLabel =
-    location.pathname.startsWith("/nodes-visualizer")
+    location.pathname.startsWith("/tiempo-real")
+      ? t("Tiempo real")
+      : location.pathname.startsWith("/nodes-visualizer")
       ? t("Panel de nodos")
       : location.pathname.startsWith("/nodes-manager")
       ? t("Gestor de nodos")
