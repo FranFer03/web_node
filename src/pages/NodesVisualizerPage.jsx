@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { getDeviceNodes, getMeasurements } from "../lib/api";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 
@@ -7,7 +6,6 @@ const POLL_INTERVAL_MS = 30000;
 
 export default function NodesVisualizerPage() {
   const { t } = useThemeLang();
-  const navigate = useNavigate();
   const [nodes, setNodes] = useState([]);
   const [measurementsByNode, setMeasurementsByNode] = useState({});
   const [loading, setLoading] = useState(true);
@@ -61,6 +59,7 @@ export default function NodesVisualizerPage() {
     <div className="panel-page">
       <div className="panel-heading-row">
         <div>
+          <span className="section-kicker">Live Monitoring</span>
           <h2>{t("Live Node Grid")}</h2>
           <p>
             {t("Real-time telemetry from mesh nodes")}
@@ -71,9 +70,6 @@ export default function NodesVisualizerPage() {
             )}
           </p>
         </div>
-        <button className="btn-primary" onClick={() => navigate("/nodes-manager")}>
-          {t("New Node")}
-        </button>
       </div>
 
       {loading && (
@@ -104,7 +100,7 @@ export default function NodesVisualizerPage() {
               return (
                 <article
                   key={node.node_id}
-                  className={`node-card ${isOffline ? "offline" : "active"}`}
+                  className={`node-card app-data-card ${isOffline ? "offline" : "active"}`}
                 >
                   <header>
                     <span className={`tag ${isOffline ? "gray" : "green"}`}>

@@ -119,6 +119,7 @@ export default function NodesManagerPage() {
     <div className="panel-page">
       <div className="panel-heading-row">
         <div>
+          <span className="section-kicker">Node Admin</span>
           <h2>{t("Industrial Mesh Control")}</h2>
           <p>{t("Real-time monitoring and deployment of LoRa-based sensor nodes.")}</p>
         </div>
@@ -127,7 +128,7 @@ export default function NodesManagerPage() {
       {error && <div className="error-box">{error}</div>}
       {success && <div className="success-box">{success}</div>}
 
-      <div className="table-card">
+      <div className="table-card app-data-card">
         <div className="table-header">
           <h3>{t("Active Network Nodes")}</h3>
           <span>
@@ -192,7 +193,7 @@ export default function NodesManagerPage() {
         )}
       </div>
 
-      <form ref={formRef} className="form-card" onSubmit={handleSubmitNode}>
+      <form ref={formRef} className="form-card app-form-panel" onSubmit={handleSubmitNode}>
         <h3>{editingNodeId ? t("Edit Node Configuration") : t("Provision New Node")}</h3>
         <label>
           {t("Node Model")}

@@ -53,6 +53,15 @@ export default function AppShell() {
     location.pathname.startsWith("/nodes-manager") ||
     location.pathname.startsWith("/packet-logs");
 
+  const currentSectionLabel =
+    location.pathname.startsWith("/nodes-visualizer")
+      ? t("Panel de nodos")
+      : location.pathname.startsWith("/nodes-manager")
+      ? t("Gestor de nodos")
+      : location.pathname.startsWith("/packet-logs")
+      ? t("Log de Paquetes")
+      : t("Dashboard");
+
   const wsStatusColor = {
     connecting: "var(--orange)",
     connected: "var(--green)",
@@ -121,7 +130,7 @@ export default function AppShell() {
             >
               <span className="material-symbols-outlined">{item.icon}</span>
               {!collapsed && (
-                <div>
+                <div className="nav-copy">
                   <span>{item.label}</span>
                   <small>{item.subtitle}</small>
                 </div>
@@ -165,7 +174,9 @@ export default function AppShell() {
             >
               <span className="material-symbols-outlined">menu</span>
             </button>
-            <h1>{isDashboardFamily ? "LoRa Mesh Monitor" : "Panel"}</h1>
+            <span className="section-kicker topbar-section-label">
+              {isDashboardFamily ? currentSectionLabel : "Panel"}
+            </span>
           </div>
           <div className="topbar-actions">
             <div

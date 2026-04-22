@@ -354,20 +354,23 @@ export default function HistoricalDashboardPage() {
     <div className="panel-page">
       <div className="panel-heading-row">
         <div>
+          <span className="section-kicker">Monitoring</span>
           <h2>{t("Dashboard")}</h2>
           <p>{t("Evolucion de lecturas del ultimo mes por sensor y por nodo.")}</p>
         </div>
         <button
-          className="btn-primary"
+          className="btn-outline refresh-icon-btn"
           type="button"
           onClick={() => fetchMeasurements(filters, selectedNodeId)}
           disabled={loading}
+          aria-label={loading ? t("Actualizando...") : t("Actualizar")}
+          title={loading ? t("Actualizando...") : t("Actualizar")}
         >
-          {loading ? t("Actualizando...") : t("Actualizar")}
+          <span className={`material-symbols-outlined${loading ? " rotating" : ""}`}>refresh</span>
         </button>
       </div>
 
-      <div className="form-card dashboard-filters">
+      <div className="form-card app-form-panel dashboard-filters">
         <div className="dashboard-filters-grid">
           <label htmlFor="filter-start">
             {t("Fecha inicio")}
@@ -412,23 +415,23 @@ export default function HistoricalDashboardPage() {
       {error && <div className="error-box">{error}</div>}
 
       <div className="stats-row dashboard-stats">
-        <article>
+        <article className="app-metric-card">
           <small>{t("Mediciones")}</small>
           <strong>{stats.total}</strong>
         </article>
-        <article>
+        <article className="app-metric-card">
           <small>{t("Nodos registrados")}</small>
           <strong>{stats.uniqueNodes}</strong>
         </article>
-        <article>
+        <article className="app-metric-card">
           <small>{t("Tipos de sensor")}</small>
           <strong>{stats.uniqueSensorTypes}</strong>
         </article>
-        <article>
+        <article className="app-metric-card">
           <small>{t("Valor promedio")}</small>
           <strong>{stats.avgValue !== null ? stats.avgValue.toFixed(2) : "-"}</strong>
         </article>
-        <article>
+        <article className="app-metric-card">
           <small>{t("Ultima medicion")}</small>
           <strong>{formatDateTime(stats.latest)}</strong>
         </article>
@@ -436,13 +439,13 @@ export default function HistoricalDashboardPage() {
 
       <div className="dashboard-sensors-grid">
         {!loading && perSensorCharts.length === 0 ? (
-          <div className="analytics-card dashboard-chart-card">
+          <div className="analytics-card dashboard-chart-card app-data-card">
             <h3>{t("Series por sensor")}</h3>
             <p>{t("No hay datos del nodo seleccionado para el rango indicado.")}</p>
           </div>
         ) : (
           perSensorCharts.map((chart) => (
-            <article key={chart.sensorTypeId} className="table-card sensor-chart-card">
+            <article key={chart.sensorTypeId} className="table-card sensor-chart-card app-data-card">
               <div className="sensor-chart-head">
                 <h3>{chart.label}</h3>
                 <span className="tag">
@@ -495,7 +498,7 @@ export default function HistoricalDashboardPage() {
         )}
       </div>
 
-      <div className="table-card node-map-card">
+      <div className="table-card node-map-card app-data-card">
         <div className="table-header">
           <h3>{t("Mini mapa del nodo")}</h3>
           <span>
@@ -515,7 +518,7 @@ export default function HistoricalDashboardPage() {
         )}
       </div>
 
-      <div className="table-card">
+      <div className="table-card app-data-card">
         <div className="table-header">
           <h3>{t("Ultimas mediciones")}</h3>
           <span>

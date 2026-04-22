@@ -149,6 +149,7 @@ export default function PacketLogsPage() {
     <div className="panel-page">
       <div className="panel-heading-row">
         <div>
+          <span className="section-kicker">Telemetry Logs</span>
           <h2>{t("Log de Paquetes")}</h2>
           <p>{t("Registros cronologicos (mas reciente primero)")}</p>
         </div>
@@ -176,7 +177,7 @@ export default function PacketLogsPage() {
       </div>
 
       {filtersOpen && (
-        <div className="form-card logs-filter-panel">
+        <div className="form-card app-form-panel logs-filter-panel">
           <div className="logs-filter-grid">
             <label>
               {t("Buscar")}
@@ -258,7 +259,7 @@ export default function PacketLogsPage() {
 
       {error && <div className="error-box">{error}</div>}
 
-      <div className="table-card">
+      <div className="table-card app-data-card">
         <div className="table-header">
           <h3>{t("Registros")}</h3>
           <span>{total} {t("entradas")}</span>
