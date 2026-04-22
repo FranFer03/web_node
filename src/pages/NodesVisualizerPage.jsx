@@ -8,7 +8,7 @@ import { appSocket } from "../lib/appSocket";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 
 const COVERAGE_RADIUS_METERS = 1000;
-const LOG_LIMIT = 5;
+const LOG_LIMIT = 3;
 const DEFAULT_CENTER = [-34.6037, -58.3816];
 const DEFAULT_ZOOM = 10;
 const DETAIL_ZOOM = 15;
@@ -118,10 +118,6 @@ export default function NodesVisualizerPage() {
       return Number.isFinite(lat) && Number.isFinite(lng);
     });
   }, [nodes]);
-
-  const activeVisibleCount = useMemo(() => {
-    return visibleNodes.filter((node) => node.status === "active").length;
-  }, [visibleNodes]);
 
   async function loadSnapshot() {
     try {
@@ -376,35 +372,11 @@ export default function NodesVisualizerPage() {
 
   return (
     <div className="panel-page realtime-page">
-      <div className="panel-heading-row">
-        <div>
-          <span className="section-kicker">Live Monitoring</span>
-          <h2>{t("Tiempo real")}</h2>
-          <p>{t("Monitoreo en vivo sobre mapa satelital.")}</p>
-        </div>
-      </div>
-
       {error && <div className="error-box">{error}</div>}
       {actionMessage && <div className="success-box">{actionMessage}</div>}
 
       <div className={`realtime-layout ${selectedNode ? "realtime-layout--with-sidebar" : ""}`}>
         <section className="realtime-map-shell table-card app-data-card">
-          <div className="realtime-summary-card">
-            <span className="section-kicker section-kicker--sidebar">{t("Cobertura activa")}</span>
-            <div className="realtime-summary-row">
-              <div>
-                <small>{t("Nodos visibles")}</small>
-                <strong>
-                  {activeVisibleCount}/{visibleNodes.length}
-                </strong>
-              </div>
-              <div>
-                <small>{t("Radio global")}</small>
-                <strong>1 km</strong>
-              </div>
-            </div>
-          </div>
-
           <div ref={mapContainerRef} className="realtime-map-canvas" />
 
           <div className="realtime-map-controls">
@@ -429,28 +401,28 @@ export default function NodesVisualizerPage() {
 
         {selectedNode && (
           <aside className="realtime-sidebar table-card app-data-card">
-            <>
-              <div className="realtime-sidebar-header">
-                <div>
-                  <small>{selectedNode.model}</small>
-                  <h3>{`N${selectedNode.node_id}`}</h3>
-                </div>
-                <div className="realtime-sidebar-header-actions">
-                  <span className={`realtime-status-pill status-${selectedNode.status}`}>
-                    {statusLabel}
-                  </span>
-                  <button
-                    type="button"
-                    className="realtime-sidebar-close"
-                    onClick={() => setSelectedNodeId(null)}
-                    aria-label="Cerrar panel"
-                    title="Cerrar panel"
-                  >
-                    <span className="material-symbols-outlined">close</span>
-                  </button>
-                </div>
+            <div className="realtime-sidebar-header">
+              <div>
+                <small>{selectedNode.model}</small>
+                <h3>{`N${selectedNode.node_id}`}</h3>
               </div>
+              <div className="realtime-sidebar-header-actions">
+                <span className={`realtime-status-pill status-${selectedNode.status}`}>
+                  {statusLabel}
+                </span>
+                <button
+                  type="button"
+                  className="realtime-sidebar-close"
+                  onClick={() => setSelectedNodeId(null)}
+                  aria-label="Cerrar panel"
+                  title="Cerrar panel"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+            </div>
 
+            <div className="realtime-sidebar-scroll">
               <div className="realtime-sidebar-section">
                 <div className="realtime-sidebar-section-head">
                   <span className="section-kicker section-kicker--sidebar">{t("Telemetria ambiental")}</span>
@@ -548,7 +520,7 @@ export default function NodesVisualizerPage() {
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           </aside>
         )}
       </div>
