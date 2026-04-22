@@ -712,6 +712,7 @@ input {
 .public-card-link {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
   gap: 0.4rem;
   padding: 0.72rem 1.1rem;
   border: 1px solid rgba(249, 115, 22, 0.28);
@@ -723,6 +724,7 @@ input {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  width: fit-content;
 }
 
 .github-link {

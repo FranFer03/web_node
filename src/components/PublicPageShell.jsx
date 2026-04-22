@@ -1,12 +1,9 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useThemeLang } from "../contexts/ThemeLangContext";
-import { getAuthState } from "../lib/auth";
 import BrandLogo from "./BrandLogo";
 
 export default function PublicPageShell({ activeSection, headerContent, children }) {
-  const navigate = useNavigate();
   const { t, theme, toggleTheme, language, changeLanguage } = useThemeLang();
-  const { isAuthenticated } = getAuthState();
   const toggleLanguage = () => changeLanguage(language === "es" ? "en" : "es");
 
   return (
@@ -42,13 +39,6 @@ export default function PublicPageShell({ activeSection, headerContent, children
           <button type="button" className="lang-toggle" onClick={toggleLanguage} aria-label={t("Change language")}>
             <span className={language === "es" ? "active" : ""}>ES</span>
             <span className={language === "en" ? "active" : ""}>EN</span>
-          </button>
-          <button
-            className="btn-outline"
-            type="button"
-            onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}
-          >
-            {isAuthenticated ? "Dashboard" : t("Ingresar")}
           </button>
         </div>
       </header>
