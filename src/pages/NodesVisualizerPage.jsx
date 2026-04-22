@@ -12,6 +12,7 @@ const LOG_LIMIT = 3;
 const DEFAULT_CENTER = [-34.6037, -58.3816];
 const DEFAULT_ZOOM = 10;
 const DETAIL_ZOOM = 15;
+const LABEL_VISIBLE_ZOOM = 13;
 const MIN_INTERVAL_MINUTES = 1;
 const MAX_INTERVAL_MINUTES = 60;
 
@@ -96,6 +97,7 @@ export default function NodesVisualizerPage() {
   const [powerSaving, setPowerSaving] = useState(false);
   const [intervalSaving, setIntervalSaving] = useState(false);
   const [intervalMinutes, setIntervalMinutes] = useState(MIN_INTERVAL_MINUTES);
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
 
   const nodesById = useMemo(() => {
     const map = new Map();
@@ -219,13 +221,19 @@ export default function NodesVisualizerPage() {
       setSelectedNodeId(null);
     };
 
+    const handleZoomEnd = () => {
+      setMapZoom(map.getZoom());
+    };
+
     map.on("dragstart", markTouched);
     map.on("zoomstart", markTouched);
+    map.on("zoomend", handleZoomEnd);
     map.on("click", handleMapClick);
 
     return () => {
       map.off("dragstart", markTouched);
       map.off("zoomstart", markTouched);
+      map.off("zoomend", handleZoomEnd);
       map.off("click", handleMapClick);
       map.remove();
       mapRef.current = null;
@@ -244,6 +252,7 @@ export default function NodesVisualizerPage() {
     }
 
     const bounds = [];
+    const showPersistentLabels = mapZoom >= LABEL_VISIBLE_ZOOM;
 
     for (const node of visibleNodes) {
       const { lat, lng } = node.coordinates;
@@ -267,11 +276,14 @@ export default function NodesVisualizerPage() {
         title: node.model,
       }).addTo(overlaysRef.current);
 
-      marker.bindTooltip(node.model, {
-        direction: "top",
-        offset: [0, -12],
-        className: "realtime-node-tooltip",
-      });
+      if (showPersistentLabels) {
+        marker.bindTooltip(node.model, {
+          permanent: true,
+          direction: "bottom",
+          offset: [0, 14],
+          className: "realtime-node-label",
+        });
+      }
 
       marker.on("click", (event) => {
         if (event?.originalEvent) {
@@ -296,7 +308,7 @@ export default function NodesVisualizerPage() {
         maxZoom: 13,
       });
     }
-  }, [visibleNodes, selectedNodeId, selectedNode]);
+  }, [visibleNodes, selectedNodeId, selectedNode, mapZoom]);
 
   async function handleTogglePower() {
     if (!selectedNode || powerSaving) return;
