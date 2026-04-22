@@ -3,6 +3,8 @@ import { useThemeLang } from "../contexts/ThemeLangContext";
 import BrandLogo from "../components/BrandLogo";
 import { getAuthState } from "../lib/auth";
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://almacenamiento-api-pf.s4bnsc.easypanel.host").replace(/\/$/, "");
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const { t, theme, toggleTheme, language, changeLanguage } = useThemeLang();
@@ -57,7 +59,7 @@ export default function LandingPage() {
         </div>
         <div className="hero-map">
           <img
-            src={`${(import.meta.env.VITE_API_BASE_URL || "https://almacenamiento-api-pf.s4bnsc.easypanel.host").replace(/\/$/, "")}/media/landing.png`}
+            src={`${API_BASE}/media/landing.png`}
             alt="LoRa Mesh"
             className="hero-image"
             onError={(e) => { e.currentTarget.style.display = "none"; }}
@@ -65,38 +67,44 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <div className="hero-stats">
+        <div className="hero-stat">
+          <div className="hero-stat-value">10<em>km</em></div>
+          <div className="hero-stat-label">{language === "es" ? "Alcance LoRa" : "LoRa Range"}</div>
+        </div>
+        <div className="hero-stat">
+          <div className="hero-stat-value">&lt; 50<em>mA</em></div>
+          <div className="hero-stat-label">{language === "es" ? "Consumo por nodo" : "Node power draw"}</div>
+        </div>
+        <div className="hero-stat">
+          <div className="hero-stat-value">Multi<em>-hop</em></div>
+          <div className="hero-stat-label">{language === "es" ? "Enrutamiento Mesh" : "Mesh routing"}</div>
+        </div>
+      </div>
+
       <section className="feature-grid feature-grid--single" id="red">
         <article>
+          <span className="feature-card-number">01 — {language === "es" ? "Red" : "Network"}</span>
           <span className="material-symbols-outlined">device_hub</span>
           <h3>{t("Comunicacion Mesh")}</h3>
           <p>{t("Los datos se enrutan por saltos intermedios para extender cobertura y mejorar resiliencia.")}</p>
         </article>
         <article>
+          <span className="feature-card-number">02 — {language === "es" ? "Impacto" : "Impact"}</span>
           <span className="material-symbols-outlined">savings</span>
           <h3>{t("Objetivo de impacto")}</h3>
           <p>{t("Ofrecer una alternativa replicable, de bajo costo operativo y adaptable a distintos escenarios.")}</p>
         </article>
         <article>
+          <span className="feature-card-number">03 — {language === "es" ? "Plataforma" : "Platform"}</span>
           <span className="material-symbols-outlined">monitoring</span>
           <h3>{t("Gateway + plataforma")}</h3>
           <p>{t("Centralizacion de datos y visualizacion historica en una interfaz web simple.")}</p>
         </article>
       </section>
 
-      <section className="cta" id="aplicaciones">
-        <h2>{t("Aplicaciones potenciales")}</h2>
-        <p>
-          {t("Agricultura de precision, monitoreo ambiental, energias renovables e iniciativas academicas que requieren telemetria confiable en zonas remotas.")}
-        </p>
-        <div className="cta-row">
-          <button className="btn-primary" onClick={() => navigate(getAuthState().isAuthenticated ? "/dashboard" : "/login")}>
-            {isAuthenticated ? "Dashboard" : t("Ir al sistema")}
-          </button>
-        </div>
-      </section>
-
       <footer className="landing-footer">
-        <span>LoRa Mesh Monitor - {t("Red de sensores inalámbricos")}</span>
+        <span>LoRa Mesh Monitor &mdash; {t("Red de sensores inalámbricos")}</span>
         <div>
           <a href="#presentacion">{t("Proyecto")}</a>
           <Link to="/about">{t("Nosotros")}</Link>
@@ -106,4 +114,3 @@ export default function LandingPage() {
     </div>
   );
 }
-

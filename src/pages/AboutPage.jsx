@@ -27,8 +27,8 @@ export default function AboutPage() {
       )}
     >
       <section className="about-section public-content-section" id="nosotros">
-        <div className="about-grid">
-          <article className="about-card">
+        <div className="about-stack">
+          <article className="about-card about-card--wide">
             <MemberPhoto src={`${API}/media/fran.jpeg`} alt="Integrante 1" className="about-photo" />
             <div className="about-info">
               <h3>{t("Integrante 1")}</h3>
@@ -39,7 +39,7 @@ export default function AboutPage() {
               </p>
             </div>
           </article>
-          <article className="about-card">
+          <article className="about-card about-card--wide about-card--reverse">
             <MemberPhoto src={`${API}/media/morty.jpeg`} alt="Integrante 2" className="about-photo" />
             <div className="about-info">
               <h3>{t("Integrante 2")}</h3>
