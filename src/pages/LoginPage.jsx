@@ -32,7 +32,7 @@ export default function LoginPage() {
       const redirectTo =
         typeof raw === "string" && raw.startsWith("/") && !raw.startsWith("//")
           ? raw
-          : "/dashboard";
+          : "/tiempo-real";
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(err.message || t("Error al conectar con la API"));

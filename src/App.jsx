@@ -24,7 +24,8 @@ export default function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
-              <Route path="/dashboard" element={<HistoricalDashboardPage />} />
+              <Route path="/dashboard" element={<Navigate to="/tiempo-real" replace />} />
+              <Route path="/dashboard-historico" element={<HistoricalDashboardPage />} />
               <Route path="/tiempo-real" element={<NodesVisualizerPage />} />
               <Route path="/nodes-visualizer" element={<NodesVisualizerPage />} />
               <Route path="/nodes-manager" element={<NodesManagerPage />} />

@@ -215,12 +215,18 @@ export default function NodesVisualizerPage() {
       mapTouchedRef.current = true;
     };
 
+    const handleMapClick = () => {
+      setSelectedNodeId(null);
+    };
+
     map.on("dragstart", markTouched);
     map.on("zoomstart", markTouched);
+    map.on("click", handleMapClick);
 
     return () => {
       map.off("dragstart", markTouched);
       map.off("zoomstart", markTouched);
+      map.off("click", handleMapClick);
       map.remove();
       mapRef.current = null;
       overlaysRef.current = null;
@@ -267,7 +273,10 @@ export default function NodesVisualizerPage() {
         className: "realtime-node-tooltip",
       });
 
-      marker.on("click", () => {
+      marker.on("click", (event) => {
+        if (event?.originalEvent) {
+          L.DomEvent.stopPropagation(event.originalEvent);
+        }
         setSelectedNodeId(node.node_id);
       });
     }

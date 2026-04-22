@@ -1,225 +1,169 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { getAuthState, resolveAvatarUrl } from "../lib/auth";
 import { useThemeLang } from "../contexts/ThemeLangContext";
-import { useWsStatus } from "../contexts/WsStatusContext";
-import BrandLogo from "./BrandLogo";
 import { logoutUser } from "../lib/api";
+
+function DockNavItem({ to, icon, label, onClick }) {
+  return (
+    <NavLink
+      to={to}
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className={({ isActive }) => `dock-nav-item ${isActive ? "active" : ""}`}
+    >
+      <span className="material-symbols-outlined" aria-hidden="true">
+        {icon}
+      </span>
+    </NavLink>
+  );
+}
 
 export default function AppShell() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = getAuthState();
   const avatarUrl = resolveAvatarUrl(user);
   const { theme, toggleTheme, language, changeLanguage, t } = useThemeLang();
-  const { status: wsStatus } = useWsStatus();
-  const [avatarFailed, setAvatarFailed] = useState(false);
-  const [collapsed, setCollapsed] = useState(true);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const toggleLanguage = () => changeLanguage(language === "es" ? "en" : "es");
-  const sidebarRef = useRef(null);
-
-  useEffect(() => {
-    setAvatarFailed(false);
-  }, [avatarUrl]);
-
-  useEffect(() => {
-    function handleOutsideClick(e) {
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) {
-        setMobileOpen(false);
-        setCollapsed(true);
-      }
-    }
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, []);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
 
   const navItems = [
-    { to: "/dashboard", label: t("Dashboard"), icon: "bar_chart", subtitle: t("Historical") },
-    { to: "/tiempo-real", label: t("Tiempo real"), icon: "monitoring", subtitle: t("Monitoreo en vivo") },
-    { to: "/nodes-visualizer", label: t("Panel de nodos"), icon: "map", subtitle: t("Informacion general de nodos") },
-    { to: "/nodes-manager", label: t("Gestor de nodos"), icon: "settings_input_antenna", subtitle: t("Edit Node Configuration") },
-    { to: "/packet-logs", label: t("Log de Paquetes"), icon: "terminal", subtitle: "Traffic analysis" },
+    { to: "/dashboard-historico", label: t("Dashboard"), icon: "bar_chart" },
+    { to: "/tiempo-real", label: t("Tiempo real"), icon: "monitoring" },
+    { to: "/nodes-manager", label: t("Gestor de nodos"), icon: "settings_input_antenna" },
+    { to: "/packet-logs", label: t("Log de Paquetes"), icon: "terminal" },
   ];
 
-  async function logout() {
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  async function handleLogout() {
+    setUserMenuOpen(false);
     await logoutUser();
     navigate("/login", { replace: true });
   }
 
-  const isDashboardFamily =
-    location.pathname.startsWith("/dashboard") ||
-    location.pathname.startsWith("/tiempo-real") ||
-    location.pathname.startsWith("/nodes-visualizer") ||
-    location.pathname.startsWith("/nodes-manager") ||
-    location.pathname.startsWith("/packet-logs");
+  function applyTheme(nextTheme) {
+    if (theme !== nextTheme) {
+      toggleTheme();
+    }
+  }
 
-  const currentSectionLabel =
-    location.pathname.startsWith("/tiempo-real")
-      ? t("Tiempo real")
-      : location.pathname.startsWith("/nodes-visualizer")
-      ? t("Panel de nodos")
-      : location.pathname.startsWith("/nodes-manager")
-      ? t("Gestor de nodos")
-      : location.pathname.startsWith("/packet-logs")
-      ? t("Log de Paquetes")
-      : t("Dashboard");
-
-  const wsStatusColor = {
-    connecting: "var(--orange)",
-    connected: "var(--green)",
-    disconnected: "var(--text-muted)",
-  }[wsStatus] || "var(--text-muted)";
-
-  const wsStatusLabel = {
-    connecting: t("Conectando..."),
-    connected: "Live",
-    disconnected: t("Sin señal"),
-  }[wsStatus] || "Live";
+  function applyLanguage(nextLanguage) {
+    if (language !== nextLanguage) {
+      changeLanguage(nextLanguage);
+    }
+  }
 
   const avatarEl = (
-    <div className="user-avatar">
-      {avatarUrl && !avatarFailed ? (
-        <img
-          src={avatarUrl}
-          alt={`Avatar de ${user?.usuario || "operator"}`}
-          className="user-avatar-image"
-          onError={() => setAvatarFailed(true)}
-        />
+    <div className="user-avatar user-avatar--dock">
+      {avatarUrl ? (
+        <img src={avatarUrl} alt={`Avatar de ${user?.usuario || "operator"}`} className="user-avatar-image" />
       ) : (
-        <span className="user-avatar-initial">
-          {(user?.usuario || "A").slice(0, 1).toUpperCase()}
+        <span className="material-symbols-outlined user-avatar-generic" aria-hidden="true">
+          account_circle
         </span>
       )}
     </div>
   );
 
   return (
-    <div className={`app-layout ${collapsed ? "sidebar-collapsed" : ""}`}>
-      <div
-        className={`mobile-overlay ${mobileOpen ? "open" : ""}`}
-        onClick={() => setMobileOpen(false)}
-      />
-
-      <aside
-        id="app-sidebar"
-        ref={sidebarRef}
-        className={`sidebar ${mobileOpen ? "open" : ""} ${collapsed ? "collapsed" : ""}`}
-        onClick={collapsed ? () => setCollapsed(false) : undefined}
-      >
-        <div className="brand-block">
-          <Link to="/" aria-label="Volver al inicio" className="sidebar-logo-link">
-            <BrandLogo className={collapsed ? "sidebar-brand-logo--mini" : "sidebar-brand-logo"} />
-          </Link>
-          {!collapsed && (
-            <button
-              className="sidebar-collapse-toggle sidebar-collapse-toggle--close"
-              onClick={() => setCollapsed(true)}
-              aria-label="Collapse sidebar"
-            >
-              <span className="material-symbols-outlined">chevron_left</span>
-            </button>
-          )}
-        </div>
-
-        <nav className="sidebar-nav">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={() => setMobileOpen(false)}
-              title={collapsed ? item.label : undefined}
-              className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
-            >
-              <span className="material-symbols-outlined">{item.icon}</span>
-              {!collapsed && (
-                <div className="nav-copy">
-                  <span>{item.label}</span>
-                  <small>{item.subtitle}</small>
-                </div>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-
-        {!collapsed ? (
-          <div className="sidebar-footer">
-            <div className="sidebar-user-pill">
-              {avatarEl}
-              <div className="sidebar-user-info">
-                <p>{user?.usuario || "operator"}</p>
-                <small>{user?.rol || "operator"}</small>
-              </div>
-            </div>
-            <button
-              className="sidebar-logout-icon"
-              onClick={logout}
-              title={t("LogoutLabel") || "Cerrar sesión"}
-              aria-label={t("LogoutLabel") || "Cerrar sesión"}
-            >
-              <span className="material-symbols-outlined">logout</span>
-            </button>
-          </div>
-        ) : (
-          <div className="sidebar-user sidebar-user--mini">{avatarEl}</div>
-        )}
-      </aside>
-
+    <div className="app-layout app-layout--bottom-dock">
       <main className="main-panel">
-        <header className="topbar">
-          <div className="topbar-left">
-            <button
-              className="menu-toggle"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label={t("Toggle Menu") || "Menu"}
-              aria-expanded={mobileOpen}
-              aria-controls="app-sidebar"
-            >
-              <span className="material-symbols-outlined">menu</span>
-            </button>
-            <span className="section-kicker topbar-section-label">
-              {isDashboardFamily ? currentSectionLabel : "Panel"}
-            </span>
-          </div>
-          <div className="topbar-actions">
-            <div
-              className="topbar-connection"
-              role="status"
-              aria-label={`${t("Estado de conexion")}: ${wsStatusLabel}`}
-            >
-              <span
-                className={`status-dot${wsStatus === "connecting" ? " connecting" : ""}`}
-                style={{ background: wsStatusColor }}
-                aria-hidden="true"
-              />
-              <span>{wsStatusLabel}</span>
-            </div>
-            <button
-              className={`btn-outline theme-toggle ${theme === "dark" ? "is-dark" : "is-light"}`}
-              onClick={toggleTheme}
-              aria-label={t("Change theme")}
-              type="button"
-            >
-              <span className="material-symbols-outlined theme-icon">
-                {theme === "dark" ? "light_mode" : "dark_mode"}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="lang-toggle"
-              onClick={toggleLanguage}
-              aria-label={t("Change language")}
-            >
-              <span className={language === "es" ? "active" : ""}>ES</span>
-              <span className={language === "en" ? "active" : ""}>EN</span>
-            </button>
-          </div>
-        </header>
         <section className="main-content">
           <Outlet />
         </section>
       </main>
+
+      <div className="bottom-dock-shell">
+        <nav className="bottom-dock" aria-label={t("Monitoreo en vivo")}>
+          {navItems.map((item) => (
+            <DockNavItem
+              key={item.to}
+              to={item.to}
+              icon={item.icon}
+              label={item.label}
+              onClick={() => setUserMenuOpen(false)}
+            />
+          ))}
+
+          <div className="dock-user-wrap" ref={userMenuRef}>
+            <button
+              type="button"
+              className={`dock-nav-item dock-user-trigger ${userMenuOpen ? "active" : ""}`}
+              aria-label={t("Usuario")}
+              title={t("Usuario")}
+              aria-expanded={userMenuOpen}
+              aria-haspopup="menu"
+              onClick={() => setUserMenuOpen((prev) => !prev)}
+            >
+              {avatarEl}
+            </button>
+
+            {userMenuOpen && (
+              <div className="dock-user-popover" role="menu">
+                <div className="dock-user-popover__header">
+                  <strong>{user?.usuario || "operator"}</strong>
+                  <span>{user?.rol || "operator"}</span>
+                </div>
+
+                <div className="dock-user-popover__section">
+                  <small>{t("Change theme")}</small>
+                  <div className="dock-option-row">
+                    <button
+                      type="button"
+                      className={`dock-option-pill ${theme === "light" ? "active" : ""}`}
+                      onClick={() => applyTheme("light")}
+                    >
+                      Claro
+                    </button>
+                    <button
+                      type="button"
+                      className={`dock-option-pill ${theme === "dark" ? "active" : ""}`}
+                      onClick={() => applyTheme("dark")}
+                    >
+                      Oscuro
+                    </button>
+                  </div>
+                </div>
+
+                <div className="dock-user-popover__section">
+                  <small>{t("Change language")}</small>
+                  <div className="dock-option-row">
+                    <button
+                      type="button"
+                      className={`dock-option-pill ${language === "es" ? "active" : ""}`}
+                      onClick={() => applyLanguage("es")}
+                    >
+                      ES
+                    </button>
+                    <button
+                      type="button"
+                      className={`dock-option-pill ${language === "en" ? "active" : ""}`}
+                      onClick={() => applyLanguage("en")}
+                    >
+                      EN
+                    </button>
+                  </div>
+                </div>
+
+                <button type="button" className="dock-logout-btn" onClick={handleLogout}>
+                  {t("LogoutLabel") || "Cerrar sesión"}
+                </button>
+              </div>
+            )}
+          </div>
+        </nav>
+      </div>
     </div>
   );
 }
