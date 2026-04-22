@@ -39,14 +39,16 @@ export default function LandingPage() {
             <span className={language === "es" ? "active" : ""}>ES</span>
             <span className={language === "en" ? "active" : ""}>EN</span>
           </button>
-          <button className="btn-outline" onClick={() => navigate(getAuthState().isAuthenticated ? "/dashboard" : "/login")}>
-            {isAuthenticated ? "Dashboard" : t("Ingresar")}
-          </button>
         </div>
       </header>
 
-      <section className="hero" id="presentacion">
-        <div>
+      <section
+        className="hero hero--fullbleed"
+        id="presentacion"
+        style={{ backgroundImage: `url(${API_BASE}/media/landing.png)` }}
+      >
+        <div className="hero-overlay" />
+        <div className="hero-center">
           <span className="pill">{t("Proyecto Final - Ingenieria Electronica")}</span>
           <h1>
             {t("Monitoreo distribuido")}
@@ -56,14 +58,14 @@ export default function LandingPage() {
           <p>
             {t("Plataforma orientada a zonas remotas que combina bajo consumo, alcance extendido y comunicacion multisalto para transportar lecturas ambientales hacia un nodo concentrador.")}
           </p>
-        </div>
-        <div className="hero-map">
-          <img
-            src={`${API_BASE}/media/landing.png`}
-            alt="LoRa Mesh"
-            className="hero-image"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
+          <div className="hero-cta-row">
+            <button className="btn-primary" onClick={() => navigate(getAuthState().isAuthenticated ? "/dashboard" : "/login")}>
+              {isAuthenticated ? "Dashboard" : t("Ir al sistema")}
+            </button>
+            <Link to="/download" className="hero-btn-ghost">
+              {t("Descargas")} →
+            </Link>
+          </div>
         </div>
       </section>
 

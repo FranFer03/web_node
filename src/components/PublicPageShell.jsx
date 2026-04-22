@@ -3,7 +3,7 @@ import { useThemeLang } from "../contexts/ThemeLangContext";
 import { getAuthState } from "../lib/auth";
 import BrandLogo from "./BrandLogo";
 
-export default function PublicPageShell({ activeSection, hero, children }) {
+export default function PublicPageShell({ activeSection, headerContent, children }) {
   const navigate = useNavigate();
   const { t, theme, toggleTheme, language, changeLanguage } = useThemeLang();
   const { isAuthenticated } = getAuthState();
@@ -53,7 +53,7 @@ export default function PublicPageShell({ activeSection, hero, children }) {
         </div>
       </header>
 
-      {hero}
+      {headerContent}
 
       {children}
 
