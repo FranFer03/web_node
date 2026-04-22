@@ -12,10 +12,12 @@ function buildErrorMessage(status, data) {
 }
 
 async function httpRequest(path, options = {}) {
+  const { token } = getAuthState();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
     ...options,
@@ -79,8 +81,120 @@ export async function getMeasurements() {
   return appSocket.request("measurements.list_recent");
 }
 
+function toMetricEntry(value, unit, timestamp) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || !timestamp) return null;
+  return { value: parsed, unit, timestamp };
+}
+
+async function buildLatestMeasurementsByNodeFallback() {
+  const [nodes, rows] = await Promise.all([
+    getDeviceNodes(),
+    appSocket.request("measurements.filter", {
+      start_date: null,
+      end_date: null,
+      node_id: null,
+    }),
+  ]);
+
+  const byNode = new Map();
+
+  for (const node of Array.isArray(nodes) ? nodes : []) {
+    byNode.set(node.node_id, {
+      node_id: node.node_id,
+      model: node.model,
+      status: node.status,
+      refresh_rate: node.refresh_rate,
+      latest_timestamp: null,
+      coordinates: null,
+      metrics: {
+        temperature: null,
+        humidity: null,
+        pressure: null,
+      },
+    });
+  }
+
+  const sortedRows = [...(Array.isArray(rows) ? rows : [])].sort((a, b) => {
+    const aTs = new Date(a?.timestamp || a?.created_at || 0).getTime();
+    const bTs = new Date(b?.timestamp || b?.created_at || 0).getTime();
+    return bTs - aTs;
+  });
+
+  for (const row of sortedRows) {
+    const entry = byNode.get(row.node_id);
+    if (!entry) continue;
+
+    const timestamp = row.timestamp || row.created_at || null;
+    if (!entry.latest_timestamp && timestamp) {
+      entry.latest_timestamp = timestamp;
+    }
+
+    if (row.sensor_type_id === 1 && !entry.metrics.temperature) {
+      entry.metrics.temperature = toMetricEntry(row.value, "°C", timestamp);
+    }
+    if (row.sensor_type_id === 2 && !entry.metrics.humidity) {
+      entry.metrics.humidity = toMetricEntry(row.value, "%", timestamp);
+    }
+    if (row.sensor_type_id === 3 && !entry.metrics.pressure) {
+      entry.metrics.pressure = toMetricEntry(row.value, "hPa", timestamp);
+    }
+    if (row.sensor_type_id === 4) {
+      const lat = Number(row.value);
+      if (Number.isFinite(lat)) {
+        entry.coordinates = {
+          lat,
+          lng: entry.coordinates?.lng ?? null,
+        };
+      }
+    }
+    if (row.sensor_type_id === 5) {
+      const lng = Number(row.value);
+      if (Number.isFinite(lng)) {
+        entry.coordinates = {
+          lat: entry.coordinates?.lat ?? null,
+          lng,
+        };
+      }
+    }
+  }
+
+  return [...byNode.values()].map((entry) => ({
+    ...entry,
+    coordinates:
+      Number.isFinite(entry.coordinates?.lat) && Number.isFinite(entry.coordinates?.lng)
+        ? entry.coordinates
+        : null,
+  }));
+}
+
 export async function getLatestMeasurementsByNode() {
-  return appSocket.request("measurements.latest_by_node");
+  try {
+    return await appSocket.request("measurements.latest_by_node");
+  } catch (err) {
+    const message = err?.message || "";
+    const shouldFallbackToHttp =
+      message.includes("Unsupported action: measurements.latest_by_node") ||
+      message.includes("WS request timeout");
+
+    if (!shouldFallbackToHttp) {
+      throw err;
+    }
+
+    try {
+      return await httpRequest("/measurements/latest-by-node");
+    } catch (httpErr) {
+      const httpMessage = httpErr?.message || "";
+      if (
+        httpMessage.includes("Recurso no encontrado") ||
+        httpMessage.includes("Acceso no autorizado.") ||
+        httpMessage.includes("Error inesperado")
+      ) {
+        return buildLatestMeasurementsByNodeFallback();
+      }
+      throw httpErr;
+    }
+  }
 }
 
 function filterByDateRange(rows, startDate, endDate) {

@@ -387,7 +387,7 @@ export default function NodesVisualizerPage() {
       {error && <div className="error-box">{error}</div>}
       {actionMessage && <div className="success-box">{actionMessage}</div>}
 
-      <div className="realtime-layout">
+      <div className={`realtime-layout ${selectedNode ? "realtime-layout--with-sidebar" : ""}`}>
         <section className="realtime-map-shell table-card app-data-card">
           <div className="realtime-summary-card">
             <span className="section-kicker section-kicker--sidebar">{t("Cobertura activa")}</span>
@@ -427,23 +427,28 @@ export default function NodesVisualizerPage() {
           )}
         </section>
 
-        <aside className="realtime-sidebar table-card app-data-card">
-          {!selectedNode ? (
-            <div className="realtime-empty-state">
-              <span className="material-symbols-outlined">orbital</span>
-              <h3>{t("Sin nodo seleccionado")}</h3>
-              <p>{t("Selecciona un nodo del mapa para ver su telemetria y controles.")}</p>
-            </div>
-          ) : (
+        {selectedNode && (
+          <aside className="realtime-sidebar table-card app-data-card">
             <>
               <div className="realtime-sidebar-header">
                 <div>
                   <small>{selectedNode.model}</small>
                   <h3>{`N${selectedNode.node_id}`}</h3>
                 </div>
-                <span className={`realtime-status-pill status-${selectedNode.status}`}>
-                  {statusLabel}
-                </span>
+                <div className="realtime-sidebar-header-actions">
+                  <span className={`realtime-status-pill status-${selectedNode.status}`}>
+                    {statusLabel}
+                  </span>
+                  <button
+                    type="button"
+                    className="realtime-sidebar-close"
+                    onClick={() => setSelectedNodeId(null)}
+                    aria-label="Cerrar panel"
+                    title="Cerrar panel"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
               </div>
 
               <div className="realtime-sidebar-section">
@@ -544,8 +549,8 @@ export default function NodesVisualizerPage() {
                 </div>
               </div>
             </>
-          )}
-        </aside>
+          </aside>
+        )}
       </div>
     </div>
   );
