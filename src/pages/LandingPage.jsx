@@ -56,7 +56,12 @@ export default function LandingPage() {
           </p>
         </div>
         <div className="hero-map">
-          <div className="map-frame" />
+          <img
+            src={`${(import.meta.env.VITE_API_BASE_URL || "https://almacenamiento-api-pf.s4bnsc.easypanel.host").replace(/\/$/, "")}/media/landing.png`}
+            alt="LoRa Mesh"
+            className="hero-image"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
         </div>
       </section>
 

@@ -1,7 +1,14 @@
-import personaje1 from "../../assets/integrantes/personaje1.jpg";
-import personaje2 from "../../assets/integrantes/personaje2.jpg";
+import { useState } from "react";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 import PublicPageShell from "../components/PublicPageShell";
+
+const API = (import.meta.env.VITE_API_BASE_URL || "https://almacenamiento-api-pf.s4bnsc.easypanel.host").replace(/\/$/, "");
+
+function MemberPhoto({ src, alt, className }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <div className={`${className} about-photo-fallback`} />;
+  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />;
+}
 
 export default function AboutPage() {
   const { t } = useThemeLang();
@@ -22,7 +29,7 @@ export default function AboutPage() {
       <section className="about-section public-content-section" id="nosotros">
         <div className="about-grid">
           <article className="about-card">
-            <img src={personaje1} alt="Integrante 1" className="about-photo" />
+            <MemberPhoto src={`${API}/media/fran.jpeg`} alt="Integrante 1" className="about-photo" />
             <div className="about-info">
               <h3>{t("Integrante 1")}</h3>
               <p>
@@ -33,7 +40,7 @@ export default function AboutPage() {
             </div>
           </article>
           <article className="about-card">
-            <img src={personaje2} alt="Integrante 2" className="about-photo" />
+            <MemberPhoto src={`${API}/media/morty.jpeg`} alt="Integrante 2" className="about-photo" />
             <div className="about-info">
               <h3>{t("Integrante 2")}</h3>
               <p>
