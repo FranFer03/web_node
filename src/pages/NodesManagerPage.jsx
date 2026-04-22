@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   createDeviceNode,
   getDeviceNodes,
@@ -9,7 +9,6 @@ import { useThemeLang } from "../contexts/ThemeLangContext";
 
 export default function NodesManagerPage() {
   const { t } = useThemeLang();
-  const formRef = useRef(null);
 
   const [nodes, setNodes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +17,7 @@ export default function NodesManagerPage() {
   const [form, setForm] = useState({ model: "", refresh_rate: 30 });
   const [saving, setSaving] = useState(false);
   const [editingNodeId, setEditingNodeId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [nodeToDelete, setNodeToDelete] = useState(null);
   const [nodeToToggle, setNodeToToggle] = useState(null);
 
@@ -39,9 +39,7 @@ export default function NodesManagerPage() {
     }
   }
 
-  useEffect(() => {
-    loadNodes();
-  }, []);
+  useEffect(() => { loadNodes(); }, []);
 
   async function handleDeleteConfirm() {
     if (!nodeToDelete) return;
@@ -63,24 +61,27 @@ export default function NodesManagerPage() {
       await updateDeviceNode(nodeToToggle.node_id, { status: newStatus });
       setNodeToToggle(null);
       await loadNodes();
-      showSuccess(
-        newStatus === "active"
-          ? t("Nodo activado correctamente.")
-          : t("Nodo desactivado correctamente.")
-      );
+      showSuccess(newStatus === "active" ? t("Nodo activado correctamente.") : t("Nodo desactivado correctamente."));
     } catch (err) {
       setError(err.message || t("Error al cargar los datos"));
       setNodeToToggle(null);
     }
   }
 
-  function handleEditClick(node) {
-    setEditingNodeId(node.node_id);
-    setForm({ model: node.model, refresh_rate: node.refresh_rate });
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  function openNewForm() {
+    setEditingNodeId(null);
+    setForm({ model: "", refresh_rate: 30 });
+    setShowForm(true);
   }
 
-  function handleCancelEdit() {
+  function openEditForm(node) {
+    setEditingNodeId(node.node_id);
+    setForm({ model: node.model, refresh_rate: node.refresh_rate });
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
     setEditingNodeId(null);
     setForm({ model: "", refresh_rate: 30 });
   }
@@ -89,7 +90,6 @@ export default function NodesManagerPage() {
     event.preventDefault();
     setSaving(true);
     setError("");
-
     try {
       if (editingNodeId) {
         await updateDeviceNode(editingNodeId, {
@@ -98,15 +98,10 @@ export default function NodesManagerPage() {
         });
         showSuccess(t("Nodo actualizado correctamente."));
       } else {
-        await createDeviceNode({
-          model: form.model,
-          refresh_rate: Number(form.refresh_rate),
-          status: "active",
-        });
+        await createDeviceNode({ model: form.model, refresh_rate: Number(form.refresh_rate), status: "active" });
         showSuccess(t("Nodo creado correctamente."));
       }
-      setEditingNodeId(null);
-      setForm({ model: "", refresh_rate: 30 });
+      closeForm();
       await loadNodes();
     } catch (err) {
       setError(err.message || t("Error al cargar los datos"));
@@ -115,145 +110,175 @@ export default function NodesManagerPage() {
     }
   }
 
+  const activeCount = nodes.filter((n) => n.status === "active").length;
+
   return (
-    <div className="panel-page">
-      <div className="panel-heading-row">
-        <div>
-          <span className="section-kicker">Node Admin</span>
-          <h2>{t("Industrial Mesh Control")}</h2>
-          <p>{t("Real-time monitoring and deployment of LoRa-based sensor nodes.")}</p>
+    <div className="panel-page nodes-manager-page">
+
+      {/* ── Header ── */}
+      <div className="nm-header">
+        <div className="nm-header__left">
+          <h2 className="nm-title">{t("Gestor de Nodos")}</h2>
+          <p className="nm-summary">
+            <span className="nm-summary__label">{t("Nodos registrados")}:</span>
+            <strong className="nm-summary__val">{nodes.length}</strong>
+            <span className="nm-summary__sep" aria-hidden="true" />
+            <span className="nm-summary__label">{t("Activos")}:</span>
+            <strong className="nm-summary__val nm-summary__val--active">{activeCount}</strong>
+          </p>
+        </div>
+        <div className="nm-toolbar">
+          <button type="button" className="nm-toolbar-btn nm-toolbar-btn--primary" onClick={openNewForm}>
+            <span className="material-symbols-outlined" aria-hidden="true">add</span>
+            {t("Nuevo nodo")}
+          </button>
         </div>
       </div>
+
+      <hr className="nm-divider" />
 
       {error && <div className="error-box">{error}</div>}
       {success && <div className="success-box">{success}</div>}
 
-      <div className="table-card app-data-card">
-        <div className="table-header">
-          <h3>{t("Active Network Nodes")}</h3>
-          <span>
-            {nodes.length} {t("nodos")}
-          </span>
-        </div>
-
-        {loading ? (
-          <div className="analytics-card">
-            <span className="material-symbols-outlined">data_usage</span>
-            <p>{t("Cargando nodos...")}</p>
-          </div>
-        ) : nodes.length > 0 ? (
-          <table>
-            <thead>
+      {/* ── Table ── */}
+      <div className="nm-table-wrap">
+        <table className="nm-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>{t("Node Model")}</th>
+              <th>{t("Refresh")}</th>
+              <th>{t("Status")}</th>
+              <th>{t("Actions")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
               <tr>
-                <th>ID</th>
-                <th>{t("Node Model")}</th>
-                <th>{t("Refresh")}</th>
-                <th>{t("Status")}</th>
-                <th>{t("Actions")}</th>
+                <td colSpan={5} className="nm-cell--center">{t("Cargando nodos...")}</td>
               </tr>
-            </thead>
-            <tbody>
-              {nodes.map((node) => (
+            ) : nodes.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="nm-cell--center">{t("No hay nodos disponibles.")}</td>
+              </tr>
+            ) : (
+              nodes.map((node) => (
                 <tr key={node.node_id}>
-                  <td>{node.node_id}</td>
-                  <td>{node.model}</td>
-                  <td>{node.refresh_rate}s</td>
+                  <td className="nm-col-id">N{node.node_id}</td>
+                  <td className="nm-col-model">{node.model}</td>
+                  <td className="nm-col-refresh">{node.refresh_rate}s</td>
                   <td>
-                    <span className={`status-pill ${node.status === "active" ? "ok" : "off"}`}>
+                    <span className={`nm-status-badge nm-status-badge--${node.status === "active" ? "active" : "off"}`}>
                       {node.status === "active" ? t("Active") : t("Offline")}
                     </span>
                   </td>
-                  <td className="table-actions">
-                    <button className="btn-muted" onClick={() => handleEditClick(node)}>
-                      {t("Editar")}
-                    </button>
+                  <td className="nm-col-actions">
                     <button
-                      className="btn-muted"
-                      style={{ color: "var(--red)" }}
-                      onClick={() => setNodeToDelete(node)}
+                      type="button"
+                      className="nm-action-btn"
+                      onClick={() => openEditForm(node)}
+                      title={t("Editar")}
                     >
-                      {t("Eliminar")}
+                      <span className="material-symbols-outlined">edit</span>
                     </button>
                     <button
-                      className="btn-muted"
-                      style={{
-                        color: node.status === "active" ? "var(--red)" : "var(--green)",
-                      }}
+                      type="button"
+                      className={`nm-action-btn nm-action-btn--${node.status === "active" ? "warn" : "ok"}`}
                       onClick={() => setNodeToToggle(node)}
+                      title={node.status === "active" ? t("Desactivar nodo") : t("Activar nodo")}
                     >
-                      {node.status === "active" ? t("Desactivar") : t("Activar")}
+                      <span className="material-symbols-outlined">
+                        {node.status === "active" ? "pause_circle" : "play_circle"}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="nm-action-btn nm-action-btn--danger"
+                      onClick={() => setNodeToDelete(node)}
+                      title={t("Eliminar")}
+                    >
+                      <span className="material-symbols-outlined">delete_outline</span>
                     </button>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p>{t("No hay nodos disponibles.")}</p>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      <form ref={formRef} className="form-card app-form-panel" onSubmit={handleSubmitNode}>
-        <h3>{editingNodeId ? t("Edit Node Configuration") : t("Provision New Node")}</h3>
-        <label>
-          {t("Node Model")}
-          <input
-            type="text"
-            value={form.model}
-            onChange={(e) => setForm({ ...form, model: e.target.value })}
-            placeholder="LoRa-E5-Mini"
-            required
-          />
-        </label>
+      {/* ── Form modal ── */}
+      {showForm && (
+        <div className="modal-backdrop" onClick={closeForm}>
+          <div className="nm-modal nm-form-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="nm-form-modal__header">
+              <h3 className="nm-form__title">
+                {editingNodeId ? t("Edit Node Configuration") : t("Provision New Node")}
+              </h3>
+              <button type="button" className="nm-modal-close" onClick={closeForm} aria-label="Cerrar">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
 
-        <label>
-          {t("Refresh Rate (seconds)")}
-          <input
-            type="number"
-            min="1"
-            value={form.refresh_rate}
-            onChange={(e) => setForm({ ...form, refresh_rate: e.target.value })}
-            required
-          />
-        </label>
+            <form onSubmit={handleSubmitNode}>
+              <div className="nm-form__grid">
+                <div className="nm-form__field">
+                  <label className="nm-form__label" htmlFor="nm-model">{t("Node Model")}</label>
+                  <input
+                    id="nm-model"
+                    type="text"
+                    value={form.model}
+                    onChange={(e) => setForm({ ...form, model: e.target.value })}
+                    placeholder="LoRa-E5-Mini"
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div className="nm-form__field">
+                  <label className="nm-form__label" htmlFor="nm-refresh">{t("Refresh Rate (seconds)")}</label>
+                  <input
+                    id="nm-refresh"
+                    type="number"
+                    min="1"
+                    value={form.refresh_rate}
+                    onChange={(e) => setForm({ ...form, refresh_rate: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-        <div className="form-actions">
-          <button className="btn-primary" type="submit" disabled={saving}>
-            {saving
-              ? editingNodeId
-                ? t("Guardando...")
-                : t("Creando...")
-              : editingNodeId
-              ? t("Save Changes")
-              : t("Deploy Node to Mesh")}
-          </button>
-          {editingNodeId && (
-            <button type="button" className="btn-muted" onClick={handleCancelEdit} disabled={saving}>
-              {t("Cancel")}
-            </button>
-          )}
+              <div className="nm-form__actions">
+                <button className="nm-submit-btn" type="submit" disabled={saving}>
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    {editingNodeId ? "save" : "cloud_upload"}
+                  </span>
+                  {saving
+                    ? (editingNodeId ? t("Guardando...") : t("Creando..."))
+                    : (editingNodeId ? t("Save Changes") : t("Deploy Node to Mesh"))}
+                </button>
+                <button type="button" className="nm-cancel-btn" onClick={closeForm} disabled={saving}>
+                  {t("Cancel")}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </form>
+      )}
 
-      {/* Delete confirmation modal */}
+      {/* ── Delete modal ── */}
       {nodeToDelete && (
         <div className="modal-backdrop" onClick={() => setNodeToDelete(null)}>
-          <div className="modal-dialog form-card" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: 0, color: "var(--red)" }}>{t("Confirmar Eliminación")}</h3>
-            <p style={{ marginTop: "0.5rem" }}>
-              {t("¿Eliminar el nodo")}{" "}
-              <strong>{nodeToDelete.model}</strong> (ID: {nodeToDelete.node_id})?{" "}
+          <div className="nm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="nm-modal__title nm-modal__title--danger">{t("Confirmar Eliminación")}</h3>
+            <p className="nm-modal__body">
+              {t("¿Eliminar el nodo")} <strong>{nodeToDelete.model}</strong> (ID: {nodeToDelete.node_id})?{" "}
               {t("Esta accion no se puede deshacer.")}
             </p>
-            <div className="form-actions" style={{ marginTop: "1rem" }}>
-              <button
-                className="btn-primary"
-                style={{ background: "var(--red)", flex: 1 }}
-                onClick={handleDeleteConfirm}
-              >
+            <div className="nm-modal__actions">
+              <button className="nm-submit-btn nm-submit-btn--danger" onClick={handleDeleteConfirm}>
                 {t("Sí, Eliminar")}
               </button>
-              <button className="btn-muted" style={{ flex: 1 }} onClick={() => setNodeToDelete(null)}>
+              <button className="nm-cancel-btn" onClick={() => setNodeToDelete(null)}>
                 {t("Cancel")}
               </button>
             </div>
@@ -261,32 +286,25 @@ export default function NodesManagerPage() {
         </div>
       )}
 
-      {/* Toggle confirmation modal */}
+      {/* ── Toggle modal ── */}
       {nodeToToggle && (
         <div className="modal-backdrop" onClick={() => setNodeToToggle(null)}>
-          <div className="modal-dialog form-card" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: 0 }}>
+          <div className="nm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="nm-modal__title">
               {nodeToToggle.status === "active" ? t("Desactivar nodo") : t("Activar nodo")}
             </h3>
-            <p style={{ marginTop: "0.5rem" }}>
-              {nodeToToggle.status === "active"
-                ? t("¿Desactivar el nodo")
-                : t("¿Activar el nodo")}{" "}
+            <p className="nm-modal__body">
+              {nodeToToggle.status === "active" ? t("¿Desactivar el nodo") : t("¿Activar el nodo")}{" "}
               <strong>{nodeToToggle.model}</strong> (ID: {nodeToToggle.node_id})?
             </p>
-            <div className="form-actions" style={{ marginTop: "1rem" }}>
+            <div className="nm-modal__actions">
               <button
-                className="btn-primary"
-                style={{
-                  background:
-                    nodeToToggle.status === "active" ? "var(--red)" : "var(--green)",
-                  flex: 1,
-                }}
+                className={`nm-submit-btn ${nodeToToggle.status === "active" ? "nm-submit-btn--warn" : "nm-submit-btn--ok"}`}
                 onClick={handleToggleConfirm}
               >
                 {nodeToToggle.status === "active" ? t("Sí, Desactivar") : t("Sí, Activar")}
               </button>
-              <button className="btn-muted" style={{ flex: 1 }} onClick={() => setNodeToToggle(null)}>
+              <button className="nm-cancel-btn" onClick={() => setNodeToToggle(null)}>
                 {t("Cancel")}
               </button>
             </div>

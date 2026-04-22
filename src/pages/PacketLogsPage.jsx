@@ -11,7 +11,7 @@ import {
 import { appSocket } from "../lib/appSocket";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 const LEVEL_OPTIONS = ["ALL", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"];
 
 const EMPTY_FILTERS = {
@@ -52,32 +52,68 @@ function matchesFilters(log, filters) {
   if (search && !message.includes(search) && !nodeLabel.includes(search)) return false;
 
   if (filters.dateFrom) {
-    const fromTs = new Date(`${filters.dateFrom}T00:00:00`).getTime();
+    const fromTs = new Date(filters.dateFrom).getTime();
     if (ts === null || ts < fromTs) return false;
   }
 
   if (filters.dateTo) {
-    const toTs = new Date(`${filters.dateTo}T23:59:59.999`).getTime();
+    const toTs = new Date(filters.dateTo).getTime();
     if (ts === null || ts > toTs) return false;
   }
 
   return true;
 }
 
-function formatDateTime(value, locale = "es-AR") {
-  const ts = getTimestamp({ created_at: value });
-  if (!ts) return { date: "-", time: "-" };
-  const parsed = new Date(ts);
-  if (Number.isNaN(parsed.getTime())) return { date: "-", time: "-" };
+function formatDateTime(value) {
+  if (!value) return { date: "-", time: "-" };
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return { date: "-", time: "-" };
+  const pad = (n, len = 2) => String(n).padStart(len, "0");
   return {
-    date: parsed.toLocaleDateString(locale),
-    time: parsed.toLocaleTimeString(locale, { hour12: false }),
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`,
   };
 }
 
 function buildExportName(baseName, fallbackName) {
   if (!baseName) return fallbackName;
   return baseName.replace(/[^\w.-]+/g, "_");
+}
+
+function getPageNumbers(currentPage, totalPages) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const pages = new Set([1, totalPages]);
+  for (let p = Math.max(2, currentPage - 1); p <= Math.min(totalPages - 1, currentPage + 1); p++) {
+    pages.add(p);
+  }
+
+  const sorted = [...pages].sort((a, b) => a - b);
+  const result = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
+      result.push("...");
+    }
+    result.push(sorted[i]);
+  }
+
+  return result;
+}
+
+function getNodeLines(nodeId, nodes) {
+  const node = nodes.find((n) => n.node_id === Number(nodeId));
+  if (node?.model) {
+    const label = String(node.model).toUpperCase();
+    const dash = label.indexOf("-");
+    if (dash > -1) {
+      return [label.slice(0, dash + 1), label.slice(dash + 1)];
+    }
+    return ["NODE-", label];
+  }
+  return [`N${nodeId}`, ""];
 }
 
 export default function PacketLogsPage() {
@@ -97,10 +133,7 @@ export default function PacketLogsPage() {
 
   const deferredSearch = useDeferredValue(filters.search);
   const activeFilters = useMemo(
-    () => ({
-      ...filters,
-      search: deferredSearch.trim(),
-    }),
+    () => ({ ...filters, search: deferredSearch.trim() }),
     [filters, deferredSearch],
   );
 
@@ -109,16 +142,9 @@ export default function PacketLogsPage() {
   useEffect(() => {
     let mounted = true;
     getDeviceNodes()
-      .then((rows) => {
-        if (mounted) setNodes(Array.isArray(rows) ? rows : []);
-      })
-      .catch(() => {
-        if (mounted) setNodes([]);
-      });
-
-    return () => {
-      mounted = false;
-    };
+      .then((rows) => { if (mounted) setNodes(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (mounted) setNodes([]); });
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -166,9 +192,7 @@ export default function PacketLogsPage() {
         setError(err?.message || t("Error al cargar los logs"));
       })
       .finally(() => {
-        if (requestIdRef.current === currentRequest) {
-          setLoading(false);
-        }
+        if (requestIdRef.current === currentRequest) setLoading(false);
       });
   }, [activeFilters, page, refreshTick, t]);
 
@@ -182,10 +206,10 @@ export default function PacketLogsPage() {
       }
 
       if (page === 1) {
-        setLogs((prev) => [incoming, ...prev.filter((item) => item.log_id !== incoming.log_id)].slice(0, PAGE_SIZE));
-        if (tableWrapRef.current) {
-          tableWrapRef.current.scrollTo({ top: 0, behavior: "smooth" });
-        }
+        setLogs((prev) =>
+          [incoming, ...prev.filter((item) => item.log_id !== incoming.log_id)].slice(0, PAGE_SIZE),
+        );
+        tableWrapRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       }
     });
 
@@ -193,38 +217,18 @@ export default function PacketLogsPage() {
   }, [activeFilters, page]);
 
   useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
+    if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
-
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filters.search.trim()) count += 1;
-    if (filters.dateFrom) count += 1;
-    if (filters.dateTo) count += 1;
-    if (filters.nodeId) count += 1;
-    if (filters.level !== "ALL") count += 1;
-    return count;
-  }, [filters]);
 
   function updateFilter(key, value) {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1);
   }
 
-  function clearFilters() {
-    setFilters(EMPTY_FILTERS);
-    setPage(1);
-  }
-
   async function handleDeleteRow(logId) {
-    const confirmed = window.confirm(t("Confirmar eliminacion de log"));
-    if (!confirmed) return;
-
+    if (!window.confirm(t("Confirmar eliminacion de log"))) return;
     setActionLoading(`delete-${logId}`);
     setError("");
-
     try {
       await appSocket.request("logs.delete", { log_id: logId });
       setRefreshTick((prev) => prev + 1);
@@ -236,15 +240,12 @@ export default function PacketLogsPage() {
   }
 
   async function handleClearLogs() {
-    const hasFilters = activeFilterCount > 0;
-    const confirmed = window.confirm(
-      hasFilters ? t("Confirmar eliminacion filtrada") : t("Confirmar eliminacion total"),
+    const hasFilters = Object.entries(activeFilters).some(
+      ([k, v]) => k !== "level" ? v : v !== "ALL",
     );
-    if (!confirmed) return;
-
+    if (!window.confirm(hasFilters ? t("Confirmar eliminacion filtrada") : t("Confirmar eliminacion total"))) return;
     setActionLoading("clear");
     setError("");
-
     try {
       await deleteLogsBulk({
         nodeId: activeFilters.nodeId ? Number(activeFilters.nodeId) : null,
@@ -266,7 +267,6 @@ export default function PacketLogsPage() {
   async function handleExport(format) {
     setActionLoading(`export-${format}`);
     setError("");
-
     try {
       const { blob, filename } = await exportLogs({
         format,
@@ -276,7 +276,6 @@ export default function PacketLogsPage() {
         dateFrom: activeFilters.dateFrom,
         dateTo: activeFilters.dateTo,
       });
-
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -292,216 +291,248 @@ export default function PacketLogsPage() {
     }
   }
 
+  const locale = language === "en" ? "en-US" : "es-AR";
+  const startEntry = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endEntry = Math.min(page * PAGE_SIZE, total);
+  const pageNumbers = getPageNumbers(page, totalPages);
+
   return (
     <div className="panel-page logs-archive-page">
-      <section className="logs-archive-hero app-data-card">
-        <div className="logs-archive-hero__copy">
-          <span className="section-kicker logs-archive-kicker">{t("Archivo del sistema")}</span>
-          <h2>{t("Log de Paquetes")}</h2>
-          <div className="logs-archive-stats">
-            <div className="logs-archive-statline">
-              <span>{t("Total records")}</span>
-              <strong>{total.toLocaleString(language === "en" ? "en-US" : "es-AR")}</strong>
-            </div>
-            <div className="logs-archive-statline">
-              <span>{t("Critical events (24h)")}</span>
-              <strong>{criticalLast24h.toLocaleString(language === "en" ? "en-US" : "es-AR")}</strong>
-            </div>
-          </div>
+
+      {/* ── Header ── */}
+      <div className="logs-archive-header">
+        <div className="logs-archive-header__left">
+          <h2 className="logs-archive-title">{t("Archivo del sistema")}</h2>
+          <p className="logs-archive-summary">
+            <span className="logs-archive-summary__label">{t("Total records")}:</span>
+            <strong className="logs-archive-summary__val">{total.toLocaleString(locale)}</strong>
+            <span className="logs-archive-summary__sep" aria-hidden="true" />
+            <span className="logs-archive-summary__label">{t("Critical events (24h)")}:</span>
+            <strong className="logs-archive-summary__val logs-archive-summary__val--critical">
+              {criticalLast24h.toLocaleString(locale)}
+            </strong>
+          </p>
         </div>
 
         <div className="logs-archive-toolbar">
           <button
             type="button"
-            className="btn-muted logs-archive-toolbar__button"
+            className="logs-toolbar-btn"
             onClick={() => handleExport("csv")}
             disabled={actionLoading === "export-csv"}
           >
             <span className="material-symbols-outlined" aria-hidden="true">download</span>
-            <span>CSV</span>
+            CSV
           </button>
           <button
             type="button"
-            className="btn-muted logs-archive-toolbar__button"
+            className="logs-toolbar-btn"
             onClick={() => handleExport("json")}
             disabled={actionLoading === "export-json"}
           >
             <span className="material-symbols-outlined" aria-hidden="true">code</span>
-            <span>JSON</span>
+            JSON
           </button>
           <button
             type="button"
-            className="btn-outline logs-archive-toolbar__button logs-archive-toolbar__button--danger"
+            className="logs-toolbar-btn logs-toolbar-btn--danger"
             onClick={handleClearLogs}
             disabled={actionLoading === "clear"}
           >
             <span className="material-symbols-outlined" aria-hidden="true">delete_sweep</span>
-            <span>{t("Clear Logs")}</span>
+            {t("Clear Logs")}
           </button>
         </div>
-      </section>
+      </div>
 
-      <section className="logs-archive-filters app-form-panel">
-        <div className="logs-archive-filters__grid">
-          <label>
-            <span>{t("Buscar")}</span>
+      <hr className="logs-archive-divider" />
+
+      {/* ── Filters ── */}
+      <div className="logs-archive-filters">
+        <div className="logs-filter-col">
+          <span className="logs-filter-label">{t("Buscar mensaje")}</span>
+          <div className="logs-filter-search">
+            <span className="material-symbols-outlined logs-filter-search__icon" aria-hidden="true">search</span>
             <input
               type="text"
               value={filters.search}
-              onChange={(event) => updateFilter("search", event.target.value)}
-              placeholder={t("Buscar mensaje")}
+              onChange={(e) => updateFilter("search", e.target.value)}
+              placeholder={t("ej. timeout...")}
             />
-          </label>
-          <label>
-            <span>{t("Nodo")}</span>
-            <select
-              value={filters.nodeId}
-              onChange={(event) => updateFilter("nodeId", event.target.value)}
-            >
-              <option value="">{t("Todos los nodos")}</option>
-              {nodes.map((node) => (
-                <option key={node.node_id} value={String(node.node_id)}>
-                  {`N${node.node_id} - ${node.model}`}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>{t("Tipo")}</span>
-            <select
-              value={filters.level}
-              onChange={(event) => updateFilter("level", event.target.value)}
-            >
-              {LEVEL_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option === "ALL" ? t("Todos los niveles") : option}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>{t("Desde")}</span>
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(event) => updateFilter("dateFrom", event.target.value)}
-            />
-          </label>
-          <label>
-            <span>{t("Hasta")}</span>
-            <input
-              type="date"
-              value={filters.dateTo}
-              onChange={(event) => updateFilter("dateTo", event.target.value)}
-            />
-          </label>
+          </div>
         </div>
 
-        <div className="logs-archive-filters__meta">
-          <span>
-            {t("Filtros activos")}: {activeFilterCount}
-          </span>
-          <button type="button" className="btn-muted logs-archive-reset" onClick={clearFilters}>
-            {t("Limpiar todos")}
-          </button>
+        <div className="logs-filter-col">
+          <span className="logs-filter-label">{t("Node ID")}</span>
+          <select value={filters.nodeId} onChange={(e) => updateFilter("nodeId", e.target.value)}>
+            <option value="">{t("Todos los nodos")}</option>
+            {nodes.map((node) => (
+              <option key={node.node_id} value={String(node.node_id)}>
+                {`N${node.node_id} - ${node.model}`}
+              </option>
+            ))}
+          </select>
         </div>
-      </section>
+
+        <div className="logs-filter-col">
+          <span className="logs-filter-label">{t("Log Level")}</span>
+          <select value={filters.level} onChange={(e) => updateFilter("level", e.target.value)}>
+            {LEVEL_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt === "ALL" ? t("Todos los niveles") : opt}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="logs-filter-col">
+          <span className="logs-filter-label">{t("Desde")}</span>
+          <input
+            type="datetime-local"
+            value={filters.dateFrom}
+            onChange={(e) => updateFilter("dateFrom", e.target.value)}
+          />
+        </div>
+
+        <div className="logs-filter-col">
+          <span className="logs-filter-label">{t("Hasta")}</span>
+          <input
+            type="datetime-local"
+            value={filters.dateTo}
+            onChange={(e) => updateFilter("dateTo", e.target.value)}
+          />
+        </div>
+      </div>
 
       {error && <div className="error-box">{error}</div>}
 
-      <section className="table-card app-data-card logs-archive-table-card">
-        <div className="table-header logs-archive-table-card__header">
-          <div>
-            <h3>{t("Registros")}</h3>
-            <p>{t("Historial de eventos sincronizado por websocket.")}</p>
-          </div>
-          <span>{t("Pagina")} {page} / {totalPages}</span>
-        </div>
-
-        <div className="logs-table-wrap logs-archive-table-wrap" ref={tableWrapRef}>
-          <table className="logs-archive-table">
-            <thead>
+      {/* ── Table ── */}
+      <div className="logs-archive-table-wrap" ref={tableWrapRef}>
+        <table className="logs-archive-table">
+          <thead>
+            <tr>
+              <th>{t("Timestamp")}</th>
+              <th>{t("Node ID")}</th>
+              <th>{t("Nivel")}</th>
+              <th>{t("Mensaje de log")}</th>
+              <th>{t("Actions")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
               <tr>
-                <th>{t("Timestamp")}</th>
-                <th>{t("Nodo")}</th>
-                <th>{t("Tipo")}</th>
-                <th>{t("Mensaje de log")}</th>
-                <th>{t("Actions")}</th>
+                <td colSpan={5} className="logs-table-cell--center">{t("Actualizando...")}</td>
               </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5}>{t("Cargando logs...")}</td>
-                </tr>
-              ) : logs.length === 0 ? (
-                <tr>
-                  <td colSpan={5}>{t("No hay logs para los filtros actuales")}</td>
-                </tr>
-              ) : (
-                logs.map((log) => {
-                  const { date, time } = formatDateTime(getTimestamp(log), language === "en" ? "en-US" : "es-AR");
-                  const level = String(log.level || "").toUpperCase();
-                  const tone = LEVEL_TONE[level] || "debug";
+            ) : logs.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="logs-table-cell--center">{t("No hay logs para los filtros actuales")}</td>
+              </tr>
+            ) : (
+              logs.map((log) => {
+                const { date, time } = formatDateTime(getTimestamp(log));
+                const level = String(log.level || "").toUpperCase();
+                const tone = LEVEL_TONE[level] || "debug";
+                const [nodeTop, nodeBot] = getNodeLines(log.node_id, nodes);
 
-                  return (
-                    <tr key={log.log_id}>
-                      <td className="logs-archive-table__timestamp">
-                        <span>{date}</span>
-                        <strong>{time}</strong>
-                      </td>
-                      <td className="logs-archive-table__node">{`N${log.node_id}`}</td>
-                      <td>
-                        <span className={`logs-archive-level logs-archive-level--${tone}`}>
-                          {level}
-                        </span>
-                      </td>
-                      <td className="logs-archive-table__message">{log.message}</td>
-                      <td className="logs-archive-table__actions">
-                        <button
-                          type="button"
-                          className="logs-row-action"
-                          onClick={() => handleDeleteRow(log.log_id)}
-                          disabled={actionLoading === `delete-${log.log_id}`}
-                          aria-label={t("Eliminar")}
-                          title={t("Eliminar")}
-                        >
-                          <span className="material-symbols-outlined" aria-hidden="true">delete</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                return (
+                  <tr key={log.log_id}>
+                    <td className="logs-col-timestamp">
+                      <span className="logs-col-timestamp__date">{date}</span>
+                      <strong className="logs-col-timestamp__time">{time}</strong>
+                    </td>
+                    <td className="logs-col-node">
+                      <span>{nodeTop}</span>
+                      {nodeBot && <span>{nodeBot}</span>}
+                    </td>
+                    <td>
+                      <span className={`logs-level logs-level--${tone}`}>{level}</span>
+                    </td>
+                    <td className="logs-col-message">{log.message}</td>
+                    <td className="logs-col-actions">
+                      <button
+                        type="button"
+                        className="logs-row-action"
+                        onClick={() => handleDeleteRow(log.log_id)}
+                        disabled={actionLoading === `delete-${log.log_id}`}
+                        aria-label={t("Eliminar")}
+                        title={t("Eliminar")}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">delete_outline</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
 
-        <div className="logs-archive-pagination">
-          <div className="logs-archive-pagination__summary">
-            {loading ? t("Actualizando...") : `${t("Mostrando")} ${logs.length} / ${total.toLocaleString(language === "en" ? "en-US" : "es-AR")}`}
-          </div>
-          <div className="logs-archive-pagination__controls">
-            <button
-              type="button"
-              className="btn-muted"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={loading || page <= 1}
-            >
-              {t("Anterior")}
-            </button>
-            <span className="logs-archive-pagination__current">{page}</span>
-            <button
-              type="button"
-              className="btn-muted"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={loading || page >= totalPages}
-            >
-              {t("Siguiente")}
-            </button>
-          </div>
+      {/* ── Pagination ── */}
+      <div className="logs-archive-pagination">
+        <span className="logs-archive-pagination__summary">
+          {loading
+            ? t("Actualizando...")
+            : `${t("Mostrando")} ${startEntry.toLocaleString(locale)}–${endEntry.toLocaleString(locale)} ${t("de")} ${total.toLocaleString(locale)} ${t("entradas")}`}
+        </span>
+
+        <div className="logs-archive-pagination__controls">
+          <button
+            type="button"
+            className="logs-page-btn"
+            onClick={() => setPage(1)}
+            disabled={loading || page <= 1}
+            aria-label="First page"
+          >
+            <span className="material-symbols-outlined">first_page</span>
+          </button>
+          <button
+            type="button"
+            className="logs-page-btn"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={loading || page <= 1}
+            aria-label="Previous page"
+          >
+            <span className="material-symbols-outlined">chevron_left</span>
+          </button>
+
+          {pageNumbers.map((p, i) =>
+            p === "..." ? (
+              <span key={`ellipsis-${i}`} className="logs-page-ellipsis">…</span>
+            ) : (
+              <button
+                key={p}
+                type="button"
+                className={`logs-page-btn${p === page ? " logs-page-btn--active" : ""}`}
+                onClick={() => setPage(p)}
+                disabled={loading}
+              >
+                {p}
+              </button>
+            ),
+          )}
+
+          <button
+            type="button"
+            className="logs-page-btn"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={loading || page >= totalPages}
+            aria-label="Next page"
+          >
+            <span className="material-symbols-outlined">chevron_right</span>
+          </button>
+          <button
+            type="button"
+            className="logs-page-btn"
+            onClick={() => setPage(totalPages)}
+            disabled={loading || page >= totalPages}
+            aria-label="Last page"
+          >
+            <span className="material-symbols-outlined">last_page</span>
+          </button>
         </div>
-      </section>
+      </div>
+
     </div>
   );
 }

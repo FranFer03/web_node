@@ -240,7 +240,19 @@ const translations = {
     "Confirmar eliminacion filtrada": "Delete all logs matching the current filters?",
     "Confirmar eliminacion total": "Delete all logs? This action cannot be undone.",
     "Error al eliminar logs": "Error deleting logs",
-    "Error al exportar logs": "Error exporting logs"
+    "Error al exportar logs": "Error exporting logs",
+    "Node ID": "Node ID",
+    "Log Level": "Log Level",
+    "Desde": "Time range (from)",
+    "Hasta": "Time range (to)",
+    "ej. timeout...": "e.g. timeout...",
+    "de": "of",
+    "Nivel": "Level",
+    "No hay logs para los filtros actuales": "No logs match the current filters",
+    "Error al cargar los logs": "Error loading logs",
+    "Gestor de Nodos": "Node Manager",
+    "Activos": "Active",
+    "Nuevo nodo": "New Node"
   },
   es: {
     "Features": "Características",
@@ -424,6 +436,18 @@ const translations = {
     "Confirmar eliminacion total": "¿Eliminar todos los logs? Esta accion no se puede deshacer.",
     "Error al eliminar logs": "Error al eliminar logs",
     "Error al exportar logs": "Error al exportar logs",
+    "Node ID": "ID Nodo",
+    "Log Level": "Nivel Log",
+    "Desde": "Rango (desde)",
+    "Hasta": "Rango (hasta)",
+    "ej. timeout...": "ej. timeout...",
+    "de": "de",
+    "Nivel": "Nivel",
+    "No hay logs para los filtros actuales": "Sin resultados para los filtros actuales",
+    "Error al cargar los logs": "Error al cargar los logs",
+    "Gestor de Nodos": "Gestor de Nodos",
+    "Activos": "Activos",
+    "Nuevo nodo": "Nuevo nodo"
   }
 };
 
