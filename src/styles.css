@@ -38,6 +38,20 @@
   --toast-bg: rgba(10, 14, 24, 0.94);
   --toast-border: rgba(249, 115, 22, 0.22);
   --toast-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+  --map-control-bg: rgba(10, 12, 18, 0.88);
+  --map-control-border: rgba(255, 255, 255, 0.1);
+  --map-overlay-bg: rgba(6, 8, 13, 0.24);
+  --map-attribution-bg: rgba(8, 10, 16, 0.8);
+  --map-node-fill: #ff7a1a;
+  --map-node-muted: rgba(255, 122, 26, 0.52);
+  --map-node-border: rgba(255, 255, 255, 0.22);
+  --map-node-ring: rgba(255, 122, 26, 0.18);
+  --map-node-ring-muted: rgba(255, 122, 26, 0.1);
+  --map-node-ring-selected: rgba(255, 122, 26, 0.22);
+  --map-node-glow: rgba(255, 122, 26, 0.4);
+  --map-node-glow-selected: rgba(255, 122, 26, 0.55);
+  --map-tooltip-bg: rgba(10, 12, 18, 0.92);
+  --map-tooltip-border: rgba(255, 122, 26, 0.2);
 
   --orange: #f97316;
   --green: #10b981;
@@ -82,6 +96,20 @@
   --toast-bg: rgba(255, 255, 255, 0.98);
   --toast-border: rgba(234, 88, 12, 0.24);
   --toast-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  --map-control-bg: rgba(255, 255, 255, 0.94);
+  --map-control-border: rgba(148, 163, 184, 0.24);
+  --map-overlay-bg: rgba(255, 255, 255, 0.28);
+  --map-attribution-bg: rgba(255, 255, 255, 0.92);
+  --map-node-fill: #ea580c;
+  --map-node-muted: rgba(234, 88, 12, 0.5);
+  --map-node-border: rgba(255, 255, 255, 0.95);
+  --map-node-ring: rgba(234, 88, 12, 0.16);
+  --map-node-ring-muted: rgba(234, 88, 12, 0.08);
+  --map-node-ring-selected: rgba(234, 88, 12, 0.2);
+  --map-node-glow: rgba(234, 88, 12, 0.22);
+  --map-node-glow-selected: rgba(234, 88, 12, 0.28);
+  --map-tooltip-bg: rgba(255, 255, 255, 0.96);
+  --map-tooltip-border: rgba(234, 88, 12, 0.24);
 
   --orange: #ea580c;
   --green: #059669;
@@ -1857,8 +1885,8 @@ input {
 .realtime-map-btn {
   width: 50px;
   height: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(10, 12, 18, 0.88);
+  border: 1px solid var(--map-control-border);
+  background: var(--map-control-bg);
   color: var(--text);
   font-size: 1.5rem;
   cursor: pointer;
@@ -1886,7 +1914,7 @@ input {
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  background: rgba(6, 8, 13, 0.24);
+  background: var(--map-overlay-bg);
   pointer-events: none;
 }
 
@@ -1896,7 +1924,7 @@ input {
 }
 
 .leaflet-control-attribution {
-  background: rgba(8, 10, 16, 0.8) !important;
+  background: var(--map-attribution-bg) !important;
   color: var(--text-muted) !important;
 }
 
@@ -1914,28 +1942,28 @@ input {
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  background: #ff7a1a;
-  border: 2px solid rgba(255, 255, 255, 0.22);
-  box-shadow: 0 0 0 6px rgba(255, 122, 26, 0.18), 0 0 20px rgba(255, 122, 26, 0.4);
+  background: var(--map-node-fill);
+  border: 2px solid var(--map-node-border);
+  box-shadow: 0 0 0 6px var(--map-node-ring), 0 0 20px var(--map-node-glow);
   transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
 .realtime-node-icon.muted {
-  background: rgba(255, 122, 26, 0.52);
-  box-shadow: 0 0 0 4px rgba(255, 122, 26, 0.1);
+  background: var(--map-node-muted);
+  box-shadow: 0 0 0 4px var(--map-node-ring-muted);
   opacity: 0.8;
 }
 
 .realtime-node-icon.selected {
   transform: scale(1.18);
-  box-shadow: 0 0 0 8px rgba(255, 122, 26, 0.22), 0 0 26px rgba(255, 122, 26, 0.55);
+  box-shadow: 0 0 0 8px var(--map-node-ring-selected), 0 0 26px var(--map-node-glow-selected);
 }
 
 .realtime-node-tooltip,
 .realtime-node-label {
-  background: rgba(10, 12, 18, 0.92);
+  background: var(--map-tooltip-bg);
   color: var(--orange);
-  border: 1px solid rgba(255, 122, 26, 0.2);
+  border: 1px solid var(--map-tooltip-border);
   border-radius: 0;
   box-shadow: none;
   font-family: var(--mono);
@@ -1945,7 +1973,7 @@ input {
 }
 
 .realtime-node-tooltip::before {
-  border-top-color: rgba(10, 12, 18, 0.92) !important;
+  border-top-color: var(--map-tooltip-bg) !important;
 }
 
 .realtime-node-label {

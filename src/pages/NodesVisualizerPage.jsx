@@ -80,7 +80,7 @@ function buildNodeIcon(snapshot, isSelected) {
 }
 
 export default function NodesVisualizerPage() {
-  const { t } = useThemeLang();
+  const { t, theme } = useThemeLang();
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const overlaysRef = useRef(null);
@@ -126,6 +126,22 @@ export default function NodesVisualizerPage() {
       return Number.isFinite(lat) && Number.isFinite(lng);
     });
   }, [nodes]);
+
+  const mapAccent = useMemo(() => {
+    if (theme === "light") {
+      return {
+        circleColor: "#ea580c",
+        circleOpacity: 0.26,
+        circleFillOpacity: 0.14,
+      };
+    }
+
+    return {
+      circleColor: "#ff7a1a",
+      circleOpacity: 0.18,
+      circleFillOpacity: 0.16,
+    };
+  }, [theme]);
 
   async function loadSnapshot() {
     try {
@@ -287,10 +303,10 @@ export default function NodesVisualizerPage() {
         L.circle(latLng, {
           radius: COVERAGE_RADIUS_METERS,
           className: "realtime-coverage-circle",
-          color: "#ff7a1a",
-          fillColor: "#ff7a1a",
-          fillOpacity: 0.16,
-          opacity: 0.18,
+          color: mapAccent.circleColor,
+          fillColor: mapAccent.circleColor,
+          fillOpacity: mapAccent.circleFillOpacity,
+          opacity: mapAccent.circleOpacity,
           weight: 1,
         }).addTo(overlaysRef.current);
       }
@@ -332,7 +348,7 @@ export default function NodesVisualizerPage() {
         maxZoom: 13,
       });
     }
-  }, [visibleNodes, selectedNodeId, selectedNode, mapZoom]);
+  }, [visibleNodes, selectedNodeId, selectedNode, mapZoom, mapAccent]);
 
   async function handleTogglePower() {
     if (!selectedNode || powerSaving) return;
