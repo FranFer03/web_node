@@ -16,7 +16,7 @@ const DETAIL_ZOOM = 15;
 const LABEL_VISIBLE_ZOOM = 13;
 const MIN_INTERVAL_MINUTES = 1;
 const MAX_INTERVAL_MINUTES = 60;
-const SIDEBAR_EXIT_MS = 220;
+const SIDEBAR_EXIT_MS = 200;
 const SETTINGS_EXIT_MS = 220;
 const DEFAULT_COVERAGE_RADIUS_METERS = 500;
 const MIN_COVERAGE_RADIUS_METERS = 100;
@@ -103,7 +103,11 @@ export default function NodesVisualizerPage() {
   const baseLayersRef = useRef({});
   const mapTouchedRef = useRef(false);
   const selectedNodeIdRef = useRef(null);
+  const prevSelectedNodeIdRef = useRef(null);
+  const selectionZoomRef = useRef(null);
+  const awaitingSelectionZoomRef = useRef(false);
   const sidebarRef = useRef(null);
+  const closingAnimRef = useRef(null);
 
   const [nodes, setNodes] = useState([]);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
@@ -149,6 +153,13 @@ export default function NodesVisualizerPage() {
   }, [selectedNodeId]);
 
   useEffect(() => {
+    if (selectedNodeId && selectionZoomRef.current !== null && mapZoom <= selectionZoomRef.current - 1) {
+      selectionZoomRef.current = null;
+      setSelectedNodeId(null);
+    }
+  }, [mapZoom, selectedNodeId]);
+
+  useEffect(() => {
     intervalMinutesRef.current = intervalMinutes;
   }, [intervalMinutes]);
 
@@ -171,6 +182,10 @@ export default function NodesVisualizerPage() {
     }
 
     if (selectedNode) {
+      if (closingAnimRef.current) {
+        closingAnimRef.current.cancel();
+        closingAnimRef.current = null;
+      }
       setSidebarPhase("entering");
       const frameId = window.requestAnimationFrame(() => {
         setSidebarPhase("open");
@@ -181,7 +196,38 @@ export default function NodesVisualizerPage() {
 
     if (renderedSidebarNode) {
       setSidebarPhase("closing");
+
+      if (mapRef.current && sidebarRef.current && renderedSidebarNode.coordinates?.lat != null) {
+        try {
+          const mapContainer = mapRef.current.getContainer();
+          const mapRect = mapContainer.getBoundingClientRect();
+          const pt = mapRef.current.latLngToContainerPoint(
+            L.latLng(renderedSidebarNode.coordinates.lat, renderedSidebarNode.coordinates.lng)
+          );
+          const nodeX = mapRect.left + pt.x;
+          const nodeY = mapRect.top + pt.y;
+          const sidebarRect = sidebarRef.current.getBoundingClientRect();
+          const cx = sidebarRect.left + sidebarRect.width / 2;
+          const cy = sidebarRect.top + sidebarRect.height / 2;
+          const dx = Math.round(nodeX - cx);
+          const dy = Math.round(nodeY - cy);
+
+          sidebarRef.current.style.transformOrigin = "center center";
+          closingAnimRef.current = sidebarRef.current.animate(
+            [
+              { opacity: 1, transform: "translate(0,0) scale(1)", filter: "blur(0px)" },
+              { opacity: 0, transform: `translate(${dx}px,${dy}px) scale(0.07)`, filter: "blur(5px)" },
+            ],
+            { duration: SIDEBAR_EXIT_MS, easing: "cubic-bezier(0.55,0,1,0.45)", fill: "forwards" }
+          );
+        } catch (_) {
+          // fallback handled by CSS --closing class
+        }
+      }
+
       sidebarCloseTimerRef.current = window.setTimeout(() => {
+        if (sidebarRef.current) sidebarRef.current.style.transformOrigin = "";
+        if (closingAnimRef.current) { closingAnimRef.current.cancel(); closingAnimRef.current = null; }
         setRenderedSidebarNode(null);
         setRenderedSidebarLogs([]);
         setRenderedLogsError("");
@@ -503,7 +549,12 @@ export default function NodesVisualizerPage() {
     };
 
     const handleZoomEnd = () => {
-      setMapZoom(map.getZoom());
+      const z = map.getZoom();
+      if (awaitingSelectionZoomRef.current) {
+        selectionZoomRef.current = z;
+        awaitingSelectionZoomRef.current = false;
+      }
+      setMapZoom(z);
     };
 
     map.on("dragstart", markTouched);
@@ -616,10 +667,22 @@ export default function NodesVisualizerPage() {
       });
     }
 
-    if (selectedNode?.coordinates) {
+    const selectionChanged = selectedNodeId !== prevSelectedNodeIdRef.current;
+    prevSelectedNodeIdRef.current = selectedNodeId;
+
+    if (selectedNode?.coordinates && selectionChanged) {
+      const targetZoom = Math.max(mapRef.current.getZoom(), DETAIL_ZOOM);
+      if (targetZoom === mapRef.current.getZoom()) {
+        // No zoom change → zoomend won't fire, capture now
+        selectionZoomRef.current = targetZoom;
+        awaitingSelectionZoomRef.current = false;
+      } else {
+        selectionZoomRef.current = null;
+        awaitingSelectionZoomRef.current = true;
+      }
       mapRef.current.flyTo(
         [selectedNode.coordinates.lat, selectedNode.coordinates.lng],
-        Math.max(mapRef.current.getZoom(), DETAIL_ZOOM),
+        targetZoom,
         { duration: 0.45 }
       );
       return;
@@ -628,7 +691,7 @@ export default function NodesVisualizerPage() {
     if (!mapTouchedRef.current) {
       mapRef.current.fitBounds(bounds, {
         padding: [48, 48],
-        maxZoom: 13,
+        maxZoom: 16,
       });
     }
   }, [visibleNodes, selectedNodeId, selectedNode, mapZoom, mapAccent, coverageRadiusMeters]);
@@ -703,7 +766,7 @@ export default function NodesVisualizerPage() {
     }
     mapRef.current.fitBounds(
       visibleNodes.map((node) => [node.coordinates.lat, node.coordinates.lng]),
-      { padding: [48, 48], maxZoom: 13 }
+      { padding: [48, 48], maxZoom: 16 }
     );
   }
 
