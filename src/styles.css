@@ -1739,7 +1739,7 @@ input[type="date"] {
   overflow: hidden;
 }
 
-.app-data-card::before,
+.app-data-card:not(.realtime-sidebar)::before,
 .app-form-panel::before {
   content: "";
   position: absolute;
@@ -1870,8 +1870,7 @@ input[type="date"] {
   gap: 0;
 }
 
-.realtime-page .error-box,
-.realtime-page .success-box {
+.realtime-page .error-box {
   margin: 0.85rem 1rem 0;
   border-radius: 0;
   position: relative;
@@ -1914,6 +1913,51 @@ input[type="date"] {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+.realtime-map-toast {
+  position: fixed;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1.1rem 0.55rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  white-space: nowrap;
+  animation: map-toast-in 0.22s cubic-bezier(0.2, 0.9, 0.18, 1) both;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: var(--green);
+}
+
+.realtime-map-toast--warning {
+  background: rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.4);
+  color: var(--orange);
+}
+
+.realtime-map-toast .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+@keyframes map-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 
 .realtime-map-controls {
@@ -2966,8 +3010,7 @@ tbody tr:hover {
     margin: -0.35rem -0.5rem -0.5rem;
   }
 
-  .realtime-page .error-box,
-  .realtime-page .success-box {
+  .realtime-page .error-box {
     margin: 0.75rem 0.5rem 0;
   }
 
@@ -3926,8 +3969,7 @@ tbody tr:hover {
   margin: -1rem;
 }
 
-.app-layout--bottom-dock .realtime-page .error-box,
-.app-layout--bottom-dock .realtime-page .success-box {
+.app-layout--bottom-dock .realtime-page .error-box {
   margin: 1rem 1rem 0;
 }
 

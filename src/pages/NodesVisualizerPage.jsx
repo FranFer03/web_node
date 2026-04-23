@@ -116,7 +116,7 @@ export default function NodesVisualizerPage() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [error, setError] = useState("");
   const [logsError, setLogsError] = useState("");
-  const [actionMessage, setActionMessage] = useState("");
+  const [actionToast, setActionToast] = useState(null); // { message, type: "success"|"warning" }
   const [powerSaving, setPowerSaving] = useState(false);
   const [intervalSaving, setIntervalSaving] = useState(false);
   const [intervalMinutes, setIntervalMinutes] = useState(MIN_INTERVAL_MINUTES);
@@ -153,6 +153,12 @@ export default function NodesVisualizerPage() {
   }, [selectedNodeId]);
 
   useEffect(() => {
+    if (!actionToast) return;
+    const t = window.setTimeout(() => setActionToast(null), 1000);
+    return () => window.clearTimeout(t);
+  }, [actionToast]);
+
+  useEffect(() => {
     if (selectedNodeId && selectionZoomRef.current !== null && mapZoom <= selectionZoomRef.current - 1) {
       selectionZoomRef.current = null;
       setSelectedNodeId(null);
@@ -175,70 +181,67 @@ export default function NodesVisualizerPage() {
     setRenderedLogsLoading(logsLoading);
   }, [selectedNode, logs, logsError, logsLoading]);
 
+  // Opening: only fires when selectedNodeId changes (not on node data updates)
   useEffect(() => {
+    if (!selectedNodeId) return;
     if (sidebarCloseTimerRef.current) {
       clearTimeout(sidebarCloseTimerRef.current);
       sidebarCloseTimerRef.current = null;
     }
+    if (closingAnimRef.current) {
+      closingAnimRef.current.cancel();
+      closingAnimRef.current = null;
+    }
+    setSidebarPhase("entering");
+    const frameId = window.requestAnimationFrame(() => setSidebarPhase("open"));
+    return () => window.cancelAnimationFrame(frameId);
+  }, [selectedNodeId]);
 
-    if (selectedNode) {
-      if (closingAnimRef.current) {
-        closingAnimRef.current.cancel();
-        closingAnimRef.current = null;
+  // Closing: only fires when selectedNodeId becomes null
+  useEffect(() => {
+    if (selectedNodeId || !renderedSidebarNode) return;
+
+    setSidebarPhase("closing");
+
+    if (mapRef.current && sidebarRef.current && renderedSidebarNode.coordinates?.lat != null) {
+      try {
+        const mapContainer = mapRef.current.getContainer();
+        const mapRect = mapContainer.getBoundingClientRect();
+        const pt = mapRef.current.latLngToContainerPoint(
+          L.latLng(renderedSidebarNode.coordinates.lat, renderedSidebarNode.coordinates.lng)
+        );
+        const nodeX = mapRect.left + pt.x;
+        const nodeY = mapRect.top + pt.y;
+        const sidebarRect = sidebarRef.current.getBoundingClientRect();
+        const cx = sidebarRect.left + sidebarRect.width / 2;
+        const cy = sidebarRect.top + sidebarRect.height / 2;
+        const dx = Math.round(nodeX - cx);
+        const dy = Math.round(nodeY - cy);
+
+        sidebarRef.current.style.transformOrigin = "center center";
+        closingAnimRef.current = sidebarRef.current.animate(
+          [
+            { opacity: 1, transform: "translate(0,0) scale(1)", filter: "blur(0px)" },
+            { opacity: 0, transform: `translate(${dx}px,${dy}px) scale(0.07)`, filter: "blur(5px)" },
+          ],
+          { duration: SIDEBAR_EXIT_MS, easing: "cubic-bezier(0.55,0,1,0.45)", fill: "forwards" }
+        );
+      } catch (_) {
+        // fallback handled by CSS --closing class
       }
-      setSidebarPhase("entering");
-      const frameId = window.requestAnimationFrame(() => {
-        setSidebarPhase("open");
-      });
-
-      return () => window.cancelAnimationFrame(frameId);
     }
 
-    if (renderedSidebarNode) {
-      setSidebarPhase("closing");
-
-      if (mapRef.current && sidebarRef.current && renderedSidebarNode.coordinates?.lat != null) {
-        try {
-          const mapContainer = mapRef.current.getContainer();
-          const mapRect = mapContainer.getBoundingClientRect();
-          const pt = mapRef.current.latLngToContainerPoint(
-            L.latLng(renderedSidebarNode.coordinates.lat, renderedSidebarNode.coordinates.lng)
-          );
-          const nodeX = mapRect.left + pt.x;
-          const nodeY = mapRect.top + pt.y;
-          const sidebarRect = sidebarRef.current.getBoundingClientRect();
-          const cx = sidebarRect.left + sidebarRect.width / 2;
-          const cy = sidebarRect.top + sidebarRect.height / 2;
-          const dx = Math.round(nodeX - cx);
-          const dy = Math.round(nodeY - cy);
-
-          sidebarRef.current.style.transformOrigin = "center center";
-          closingAnimRef.current = sidebarRef.current.animate(
-            [
-              { opacity: 1, transform: "translate(0,0) scale(1)", filter: "blur(0px)" },
-              { opacity: 0, transform: `translate(${dx}px,${dy}px) scale(0.07)`, filter: "blur(5px)" },
-            ],
-            { duration: SIDEBAR_EXIT_MS, easing: "cubic-bezier(0.55,0,1,0.45)", fill: "forwards" }
-          );
-        } catch (_) {
-          // fallback handled by CSS --closing class
-        }
-      }
-
-      sidebarCloseTimerRef.current = window.setTimeout(() => {
-        if (sidebarRef.current) sidebarRef.current.style.transformOrigin = "";
-        if (closingAnimRef.current) { closingAnimRef.current.cancel(); closingAnimRef.current = null; }
-        setRenderedSidebarNode(null);
-        setRenderedSidebarLogs([]);
-        setRenderedLogsError("");
-        setRenderedLogsLoading(false);
-        setSidebarPhase("closed");
-        sidebarCloseTimerRef.current = null;
-      }, SIDEBAR_EXIT_MS);
-    }
-
-    return undefined;
-  }, [selectedNode, renderedSidebarNode]);
+    sidebarCloseTimerRef.current = window.setTimeout(() => {
+      if (sidebarRef.current) sidebarRef.current.style.transformOrigin = "";
+      if (closingAnimRef.current) { closingAnimRef.current.cancel(); closingAnimRef.current = null; }
+      setRenderedSidebarNode(null);
+      setRenderedSidebarLogs([]);
+      setRenderedLogsError("");
+      setRenderedLogsLoading(false);
+      setSidebarPhase("closed");
+      sidebarCloseTimerRef.current = null;
+    }, SIDEBAR_EXIT_MS);
+  }, [selectedNodeId, renderedSidebarNode]);
 
   useEffect(() => {
     return () => {
@@ -702,7 +705,7 @@ export default function NodesVisualizerPage() {
 
     try {
       setPowerSaving(true);
-      setActionMessage("");
+      setActionToast(null);
       await updateDeviceNode(selectedNode.node_id, { status: nextStatus });
       setNodes((prev) =>
         sortSnapshots(
@@ -711,11 +714,10 @@ export default function NodesVisualizerPage() {
           )
         )
       );
-      setActionMessage(
-        nextStatus === "active"
-          ? t("Nodo activado correctamente.")
-          : t("Nodo desactivado correctamente.")
-      );
+      setActionToast({
+        message: nextStatus === "active" ? t("Nodo activado correctamente.") : t("Nodo desactivado correctamente."),
+        type: nextStatus === "active" ? "success" : "warning",
+      });
     } catch (err) {
       setError(err.message || t("Error al cargar los datos"));
     } finally {
@@ -730,7 +732,7 @@ export default function NodesVisualizerPage() {
 
     try {
       setIntervalSaving(true);
-      setActionMessage("");
+      setActionToast(null);
       await updateDeviceNode(selectedNode.node_id, { refresh_rate: nextSeconds });
       setNodes((prev) =>
         sortSnapshots(
@@ -741,7 +743,7 @@ export default function NodesVisualizerPage() {
           )
         )
       );
-      setActionMessage(t("Intervalo actualizado."));
+      setActionToast({ message: t("Intervalo actualizado."), type: "success" });
     } catch (err) {
       setError(err.message || t("Error al cargar los datos"));
     } finally {
@@ -789,7 +791,14 @@ export default function NodesVisualizerPage() {
   return (
     <div className="panel-page realtime-page">
       {error && <div className="error-box">{error}</div>}
-      {actionMessage && <div className="success-box">{actionMessage}</div>}
+      {actionToast && (
+        <div className={`realtime-map-toast realtime-map-toast--${actionToast.type}`} role="status">
+          <span className="material-symbols-outlined">
+            {actionToast.type === "success" ? "check_circle" : "power_off"}
+          </span>
+          {actionToast.message}
+        </div>
+      )}
 
       <div className={`realtime-layout ${sidebarNode ? "realtime-layout--with-sidebar" : ""}`}>
         <section ref={mapShellRef} className="realtime-map-shell table-card app-data-card">
