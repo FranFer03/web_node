@@ -2,13 +2,13 @@ import "leaflet/dist/leaflet.css";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
+import { useNavigate } from "react-router-dom";
 
 import { getLatestMeasurementsByNode, getLogs, updateDeviceNode } from "../lib/api";
 import { appSocket } from "../lib/appSocket";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 import { extractRealtimeLog } from "../lib/realtimeLogs";
 
-const COVERAGE_RADIUS_METERS = 1000;
 const LOG_LIMIT = 3;
 const DEFAULT_CENTER = [-34.6037, -58.3816];
 const DEFAULT_ZOOM = 10;
@@ -17,12 +17,23 @@ const LABEL_VISIBLE_ZOOM = 13;
 const MIN_INTERVAL_MINUTES = 1;
 const MAX_INTERVAL_MINUTES = 60;
 const SIDEBAR_EXIT_MS = 220;
+const SETTINGS_EXIT_MS = 220;
+const DEFAULT_COVERAGE_RADIUS_METERS = 1000;
+const MIN_COVERAGE_RADIUS_METERS = 100;
+const MAX_COVERAGE_RADIUS_METERS = 5000;
+const COVERAGE_RADIUS_STEP_METERS = 50;
+const MAP_VIEW_MODE_SATELLITE = "satellite";
+const MAP_VIEW_MODE_TRANSIT = "transit";
+const SATELLITE_TILE_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const TRANSIT_TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
 function formatDateTime(value) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString("es-AR", {
+    hour12: false,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -81,12 +92,18 @@ function buildNodeIcon(snapshot, isSelected) {
 }
 
 export default function NodesVisualizerPage() {
+  const navigate = useNavigate();
   const { t, theme } = useThemeLang();
+  const mapControlsRef = useRef(null);
+  const mapSettingsRef = useRef(null);
+  const mapShellRef = useRef(null);
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const overlaysRef = useRef(null);
+  const baseLayersRef = useRef({});
   const mapTouchedRef = useRef(false);
   const selectedNodeIdRef = useRef(null);
+  const sidebarRef = useRef(null);
 
   const [nodes, setNodes] = useState([]);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
@@ -100,13 +117,21 @@ export default function NodesVisualizerPage() {
   const [intervalSaving, setIntervalSaving] = useState(false);
   const [intervalMinutes, setIntervalMinutes] = useState(MIN_INTERVAL_MINUTES);
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
+  const [mapViewMode, setMapViewMode] = useState(MAP_VIEW_MODE_SATELLITE);
+  const [coverageRadiusMeters, setCoverageRadiusMeters] = useState(DEFAULT_COVERAGE_RADIUS_METERS);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [renderSettingsPopup, setRenderSettingsPopup] = useState(false);
+  const [settingsPhase, setSettingsPhase] = useState("closed");
   const [renderedSidebarNode, setRenderedSidebarNode] = useState(null);
   const [renderedSidebarLogs, setRenderedSidebarLogs] = useState([]);
   const [renderedLogsError, setRenderedLogsError] = useState("");
   const [renderedLogsLoading, setRenderedLogsLoading] = useState(false);
   const [sidebarPhase, setSidebarPhase] = useState("closed");
+  const [sidebarPlacement, setSidebarPlacement] = useState("right");
+  const [sidebarInlineStyle, setSidebarInlineStyle] = useState(undefined);
   const intervalMinutesRef = useRef(MIN_INTERVAL_MINUTES);
   const sidebarCloseTimerRef = useRef(null);
+  const settingsCloseTimerRef = useRef(null);
 
   const nodesById = useMemo(() => {
     const map = new Map();
@@ -117,6 +142,7 @@ export default function NodesVisualizerPage() {
   }, [nodes]);
 
   const selectedNode = selectedNodeId ? nodesById.get(selectedNodeId) || null : null;
+  const sidebarNode = renderedSidebarNode;
 
   useEffect(() => {
     selectedNodeIdRef.current = selectedNodeId;
@@ -175,6 +201,109 @@ export default function NodesVisualizerPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (mapSettingsRef.current && !mapSettingsRef.current.contains(event.target)) {
+        setSettingsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  useEffect(() => {
+    if (settingsCloseTimerRef.current) {
+      clearTimeout(settingsCloseTimerRef.current);
+      settingsCloseTimerRef.current = null;
+    }
+
+    if (settingsOpen) {
+      setRenderSettingsPopup(true);
+      setSettingsPhase("entering");
+      const frameId = window.requestAnimationFrame(() => {
+        setSettingsPhase("open");
+      });
+
+      return () => window.cancelAnimationFrame(frameId);
+    }
+
+    if (renderSettingsPopup) {
+      setSettingsPhase("closing");
+      settingsCloseTimerRef.current = window.setTimeout(() => {
+        setRenderSettingsPopup(false);
+        setSettingsPhase("closed");
+        settingsCloseTimerRef.current = null;
+      }, SETTINGS_EXIT_MS);
+    }
+
+    return undefined;
+  }, [settingsOpen, renderSettingsPopup]);
+
+  useEffect(() => {
+    return () => {
+      if (settingsCloseTimerRef.current) {
+        clearTimeout(settingsCloseTimerRef.current);
+      }
+    };
+  }, []);
+
+  function updateSidebarAnchor(node) {
+    if (!node?.coordinates || !mapRef.current || !mapShellRef.current || !sidebarRef.current) {
+      setSidebarInlineStyle(undefined);
+      setSidebarPlacement("right");
+      return;
+    }
+
+    if (window.innerWidth <= 1000) {
+      setSidebarInlineStyle(undefined);
+      setSidebarPlacement("right");
+      return;
+    }
+
+    const map = mapRef.current;
+    const mapShellEl = mapShellRef.current;
+    const layoutEl = mapShellEl.parentElement;
+    if (!layoutEl) return;
+
+    const point = map.latLngToContainerPoint([node.coordinates.lat, node.coordinates.lng]);
+    const layoutRect = layoutEl.getBoundingClientRect();
+    const shellRect = mapShellEl.getBoundingClientRect();
+    const sidebarRect = sidebarRef.current.getBoundingClientRect();
+    const nodeX = shellRect.left - layoutRect.left + point.x;
+    const nodeY = shellRect.top - layoutRect.top + point.y;
+    const sidebarWidth = sidebarRect.width || 420;
+    const sidebarHeight = sidebarRect.height || 560;
+    const edgePadding = 18;
+    const nodeGap = 34;
+
+    let nextPlacement = "right";
+    let left = nodeX + nodeGap;
+
+    if (left + sidebarWidth > layoutRect.width - edgePadding) {
+      nextPlacement = "left";
+      left = nodeX - sidebarWidth - nodeGap;
+    }
+
+    left = Math.min(Math.max(edgePadding, left), layoutRect.width - sidebarWidth - edgePadding);
+
+    let top = nodeY - sidebarHeight * 0.44;
+    top = Math.min(Math.max(edgePadding, top), layoutRect.height - sidebarHeight - edgePadding);
+
+    const anchorOffsetY = Math.min(
+      Math.max(32, nodeY - top),
+      Math.max(32, sidebarHeight - 32)
+    );
+
+    setSidebarPlacement(nextPlacement);
+    setSidebarInlineStyle({
+      left: `${left}px`,
+      top: `${top}px`,
+      right: "auto",
+      "--realtime-anchor-offset-y": `${anchorOffsetY}px`,
+    });
+  }
 
   const visibleNodes = useMemo(() => {
     return nodes.filter((node) => {
@@ -292,6 +421,47 @@ export default function NodesVisualizerPage() {
   }, [selectedNode?.refresh_rate]);
 
   useEffect(() => {
+    if (!sidebarNode) {
+      setSidebarInlineStyle(undefined);
+      setSidebarPlacement("right");
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      updateSidebarAnchor(sidebarNode);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [
+    sidebarNode?.node_id,
+    sidebarNode?.coordinates?.lat,
+    sidebarNode?.coordinates?.lng,
+    sidebarPhase,
+    renderedSidebarLogs.length,
+    renderedLogsLoading,
+    renderedLogsError,
+    intervalMinutes,
+  ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !sidebarNode) return undefined;
+
+    const syncSidebarAnchor = () => updateSidebarAnchor(sidebarNode);
+    map.on("move", syncSidebarAnchor);
+    map.on("zoom", syncSidebarAnchor);
+    map.on("resize", syncSidebarAnchor);
+    window.addEventListener("resize", syncSidebarAnchor);
+
+    return () => {
+      map.off("move", syncSidebarAnchor);
+      map.off("zoom", syncSidebarAnchor);
+      map.off("resize", syncSidebarAnchor);
+      window.removeEventListener("resize", syncSidebarAnchor);
+    };
+  }, [sidebarNode?.node_id, sidebarNode?.coordinates?.lat, sidebarNode?.coordinates?.lng]);
+
+  useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return undefined;
 
     const map = L.map(mapContainerRef.current, {
@@ -299,13 +469,22 @@ export default function NodesVisualizerPage() {
       attributionControl: true,
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
-    L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-        maxZoom: 19,
-        attribution: "Tiles (c) Esri",
-      }
-    ).addTo(map);
+    const satelliteLayer = L.tileLayer(SATELLITE_TILE_URL, {
+      maxZoom: 19,
+      attribution: "Tiles (c) Esri",
+    });
+
+    const transitLayer = L.tileLayer(TRANSIT_TILE_URL, {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors",
+    });
+
+    baseLayersRef.current = {
+      [MAP_VIEW_MODE_SATELLITE]: satelliteLayer,
+      [MAP_VIEW_MODE_TRANSIT]: transitLayer,
+    };
+
+    baseLayersRef.current[mapViewMode]?.addTo(map);
 
     overlaysRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
@@ -316,6 +495,7 @@ export default function NodesVisualizerPage() {
 
     const handleMapClick = () => {
       setSelectedNodeId(null);
+      setSettingsOpen(false);
     };
 
     const handleZoomEnd = () => {
@@ -335,8 +515,29 @@ export default function NodesVisualizerPage() {
       map.remove();
       mapRef.current = null;
       overlaysRef.current = null;
+      baseLayersRef.current = {};
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const satelliteLayer = baseLayersRef.current[MAP_VIEW_MODE_SATELLITE];
+    const transitLayer = baseLayersRef.current[MAP_VIEW_MODE_TRANSIT];
+    if (!map || !satelliteLayer || !transitLayer) return;
+
+    const activeLayer =
+      mapViewMode === MAP_VIEW_MODE_TRANSIT ? transitLayer : satelliteLayer;
+    const inactiveLayer =
+      mapViewMode === MAP_VIEW_MODE_TRANSIT ? satelliteLayer : transitLayer;
+
+    if (map.hasLayer(inactiveLayer)) {
+      map.removeLayer(inactiveLayer);
+    }
+
+    if (!map.hasLayer(activeLayer)) {
+      activeLayer.addTo(map);
+    }
+  }, [mapViewMode]);
 
   useEffect(() => {
     if (!mapRef.current || !overlaysRef.current) return;
@@ -358,7 +559,7 @@ export default function NodesVisualizerPage() {
 
       if (node.status === "active") {
         L.circle(latLng, {
-          radius: COVERAGE_RADIUS_METERS,
+          radius: coverageRadiusMeters,
           className: "realtime-coverage-circle",
           color: mapAccent.circleColor,
           fillColor: mapAccent.circleColor,
@@ -405,7 +606,7 @@ export default function NodesVisualizerPage() {
         maxZoom: 13,
       });
     }
-  }, [visibleNodes, selectedNodeId, selectedNode, mapZoom, mapAccent]);
+  }, [visibleNodes, selectedNodeId, selectedNode, mapZoom, mapAccent, coverageRadiusMeters]);
 
   async function handleTogglePower() {
     if (!selectedNode || powerSaving) return;
@@ -481,7 +682,14 @@ export default function NodesVisualizerPage() {
     );
   }
 
-  const sidebarNode = renderedSidebarNode;
+  function toggleMapSettings() {
+    setSettingsOpen((prev) => !prev);
+  }
+
+  function handleOpenStrategicAnalysis() {
+    if (!sidebarNode?.node_id) return;
+    navigate(`/dashboard-historico?node=${sidebarNode.node_id}`);
+  }
 
   const statusLabel =
     sidebarNode?.status === "active"
@@ -496,10 +704,10 @@ export default function NodesVisualizerPage() {
       {actionMessage && <div className="success-box">{actionMessage}</div>}
 
       <div className={`realtime-layout ${sidebarNode ? "realtime-layout--with-sidebar" : ""}`}>
-        <section className="realtime-map-shell table-card app-data-card">
+        <section ref={mapShellRef} className="realtime-map-shell table-card app-data-card">
           <div ref={mapContainerRef} className="realtime-map-canvas" />
 
-          <div className="realtime-map-controls">
+          <div className="realtime-map-controls" ref={mapControlsRef}>
             <button type="button" className="realtime-map-btn" onClick={handleZoomIn} aria-label={t("Acercar")}>
               +
             </button>
@@ -509,6 +717,75 @@ export default function NodesVisualizerPage() {
             <button type="button" className="realtime-map-btn realtime-map-btn--stack" onClick={handleResetView} aria-label={t("Recentrar mapa")}>
               <span className="material-symbols-outlined">layers</span>
             </button>
+            <div className="realtime-map-settings-wrap" ref={mapSettingsRef}>
+              <button
+                type="button"
+                className={`realtime-map-btn realtime-map-btn--stack ${settingsOpen ? "is-active" : ""}`}
+                onClick={toggleMapSettings}
+                aria-label={t("Ajustes del mapa")}
+                aria-expanded={settingsOpen}
+                aria-haspopup="dialog"
+              >
+                <span className="material-symbols-outlined">settings</span>
+              </button>
+
+              {renderSettingsPopup && (
+                <div
+                  className={`realtime-map-settings realtime-map-settings--${settingsPhase}`}
+                  role="dialog"
+                  aria-hidden={settingsPhase === "closing"}
+                >
+                  <div className="realtime-map-settings__header">
+                    <strong>{t("Ajustes del mapa")}</strong>
+                    <span>{t("Vista y cobertura")}</span>
+                  </div>
+
+                  <div className="realtime-map-settings__section">
+                    <small>{t("Vista del mapa")}</small>
+                    <div className="realtime-map-settings__options">
+                      <button
+                        type="button"
+                        className={`realtime-map-settings__pill ${
+                          mapViewMode === MAP_VIEW_MODE_TRANSIT ? "active" : ""
+                        }`}
+                        onClick={() => setMapViewMode(MAP_VIEW_MODE_TRANSIT)}
+                      >
+                        {t("Transito")}
+                      </button>
+                      <button
+                        type="button"
+                        className={`realtime-map-settings__pill ${
+                          mapViewMode === MAP_VIEW_MODE_SATELLITE ? "active" : ""
+                        }`}
+                        onClick={() => setMapViewMode(MAP_VIEW_MODE_SATELLITE)}
+                      >
+                        {t("Satelital")}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="realtime-map-settings__section realtime-map-settings__section--slider">
+                    <div className="realtime-map-settings__row">
+                      <small>{t("Radio de cobertura")}</small>
+                      <strong>{coverageRadiusMeters} m</strong>
+                    </div>
+                    <input
+                      type="range"
+                      min={MIN_COVERAGE_RADIUS_METERS}
+                      max={MAX_COVERAGE_RADIUS_METERS}
+                      step={COVERAGE_RADIUS_STEP_METERS}
+                      value={coverageRadiusMeters}
+                      onChange={(e) => setCoverageRadiusMeters(Number(e.target.value))}
+                      className="realtime-slider realtime-map-settings__slider"
+                    />
+                    <div className="realtime-slider-scale">
+                      <span>{MIN_COVERAGE_RADIUS_METERS} m</span>
+                      <span>{MAX_COVERAGE_RADIUS_METERS} m</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {!loading && visibleNodes.length === 0 && (
@@ -521,8 +798,10 @@ export default function NodesVisualizerPage() {
 
         {sidebarNode && (
           <aside
-            className={`realtime-sidebar realtime-sidebar--${sidebarPhase} table-card app-data-card`}
+            ref={sidebarRef}
+            className={`realtime-sidebar realtime-sidebar--${sidebarPhase} realtime-sidebar--anchored-${sidebarPlacement} table-card app-data-card`}
             aria-hidden={sidebarPhase === "closing"}
+            style={sidebarInlineStyle}
           >
             <div className="realtime-sidebar-header">
               <div>
@@ -546,7 +825,7 @@ export default function NodesVisualizerPage() {
             </div>
 
             <div className="realtime-sidebar-scroll">
-              <div className="realtime-sidebar-section">
+              <div className="realtime-sidebar-section realtime-sidebar-section--metrics">
                 <div className="realtime-sidebar-section-head">
                   <span className="section-kicker section-kicker--sidebar">{t("Telemetria ambiental")}</span>
                   <span>{formatDateTime(sidebarNode.latest_timestamp)}</span>
@@ -577,7 +856,7 @@ export default function NodesVisualizerPage() {
                 </div>
               </div>
 
-              <div className="realtime-sidebar-section">
+              <div className="realtime-sidebar-section realtime-sidebar-section--logs">
                 <div className="realtime-sidebar-section-head">
                   <span className="section-kicker section-kicker--sidebar">{t("Logs tecnicos")}</span>
                   <span>{LOG_LIMIT}</span>
@@ -602,7 +881,7 @@ export default function NodesVisualizerPage() {
                 )}
               </div>
 
-              <div className="realtime-sidebar-section">
+              <div className="realtime-sidebar-section realtime-sidebar-section--controls">
                 <div className="realtime-control-row">
                   <div>
                     <small>{t("Energia del nodo")}</small>
@@ -649,6 +928,16 @@ export default function NodesVisualizerPage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="realtime-sidebar-footer">
+              <button
+                type="button"
+                className="realtime-strategic-btn"
+                onClick={handleOpenStrategicAnalysis}
+              >
+                Analisis Estrategico
+              </button>
             </div>
           </aside>
         )}

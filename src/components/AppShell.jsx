@@ -6,6 +6,8 @@ import { logoutUser } from "../lib/api";
 import { appSocket } from "../lib/appSocket";
 import { extractRealtimeLog, LOG_TOAST_EXIT_MS, LOG_TOAST_TTL_MS } from "../lib/realtimeLogs";
 
+const USER_MENU_EXIT_MS = 220;
+
 function DockNavItem({ to, icon, label, onClick }) {
   return (
     <NavLink
@@ -44,14 +46,17 @@ export default function AppShell() {
   const avatarUrl = resolveAvatarUrl(user);
   const { theme, toggleTheme, language, changeLanguage, t } = useThemeLang();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [renderUserMenu, setRenderUserMenu] = useState(false);
+  const [userMenuPhase, setUserMenuPhase] = useState("closed");
   const [logToasts, setLogToasts] = useState([]);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const userMenuRef = useRef(null);
   const toastTimersRef = useRef(new Map());
+  const userMenuCloseTimerRef = useRef(null);
 
   const navItems = [
-    { to: "/tiempo-real", label: t("Tiempo real"), icon: "monitoring" },
-    { to: "/dashboard-historico", label: t("Analisis estrategico"), icon: "bar_chart" },
+    { to: "/tiempo-real", label: t("Tiempo real"), icon: "map" },
+    { to: "/dashboard-historico", label: t("Analisis estrategico"), icon: "monitoring" },
     { to: "/nodes-manager", label: t("Gestor de nodo"), icon: "settings_input_antenna" },
     { to: "/packet-logs", label: t("Log"), icon: "terminal" },
   ];
@@ -65,6 +70,42 @@ export default function AppShell() {
 
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  useEffect(() => {
+    if (userMenuCloseTimerRef.current) {
+      window.clearTimeout(userMenuCloseTimerRef.current);
+      userMenuCloseTimerRef.current = null;
+    }
+
+    if (userMenuOpen) {
+      setRenderUserMenu(true);
+      setUserMenuPhase("entering");
+      const frameId = window.requestAnimationFrame(() => {
+        setUserMenuPhase("open");
+      });
+
+      return () => window.cancelAnimationFrame(frameId);
+    }
+
+    if (renderUserMenu) {
+      setUserMenuPhase("closing");
+      userMenuCloseTimerRef.current = window.setTimeout(() => {
+        setRenderUserMenu(false);
+        setUserMenuPhase("closed");
+        userMenuCloseTimerRef.current = null;
+      }, USER_MENU_EXIT_MS);
+    }
+
+    return undefined;
+  }, [userMenuOpen, renderUserMenu]);
+
+  useEffect(() => {
+    return () => {
+      if (userMenuCloseTimerRef.current) {
+        window.clearTimeout(userMenuCloseTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -182,8 +223,12 @@ export default function AppShell() {
               onClick={() => setUserMenuOpen((prev) => !prev)}
             />
 
-            {userMenuOpen && (
-              <div className="dock-user-popover" role="menu">
+            {renderUserMenu && (
+              <div
+                className={`dock-user-popover dock-user-popover--${userMenuPhase}`}
+                role="menu"
+                aria-hidden={userMenuPhase === "closing"}
+              >
                 <div className="dock-user-popover__header">
                   <strong>{user?.usuario || "operator"}</strong>
                   <span>{user?.rol || "operator"}</span>

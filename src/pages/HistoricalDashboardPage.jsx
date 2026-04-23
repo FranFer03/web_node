@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { getDeviceNodes, getMeasurementsFiltered, getSensorTypes } from "../lib/api";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 
@@ -169,6 +170,7 @@ const LINE_COLORS = ["#ef4444", "#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ea
 const TABLE_PAGE_SIZE = 5;
 
 export default function HistoricalDashboardPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useThemeLang();
   const defaultFilters = useMemo(() => getDefaultMonthFilters(), []);
 
@@ -221,11 +223,29 @@ export default function HistoricalDashboardPage() {
     [nodes]
   );
 
+  const requestedNodeId = searchParams.get("node") || "";
+
   useEffect(() => {
     if (!nodeOptions.length) return;
+    const hasRequested = requestedNodeId && nodeOptions.some((n) => n.value === requestedNodeId);
+    if (hasRequested && selectedNodeId !== requestedNodeId) {
+      setSelectedNodeId(requestedNodeId);
+      return;
+    }
+
     const exists = nodeOptions.some((n) => n.value === selectedNodeId);
     if (!exists) setSelectedNodeId(nodeOptions[0].value);
-  }, [nodeOptions]);
+  }, [nodeOptions, requestedNodeId, selectedNodeId]);
+
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    const currentNodeParam = searchParams.get("node") || "";
+    if (currentNodeParam === selectedNodeId) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("node", selectedNodeId);
+    setSearchParams(nextParams, { replace: true });
+  }, [selectedNodeId, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!selectedNodeId) return;

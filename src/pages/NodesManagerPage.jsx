@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createDeviceNode,
   getDeviceNodes,
@@ -7,6 +7,27 @@ import {
 } from "../lib/api";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 
+const MIN_REFRESH_MINUTES = 1;
+const MAX_REFRESH_MINUTES = 60;
+const DEFAULT_REFRESH_MINUTES = 30;
+const FORM_EXIT_MS = 240;
+
+function clampRefreshMinutes(value) {
+  return Math.min(MAX_REFRESH_MINUTES, Math.max(MIN_REFRESH_MINUTES, Number(value) || DEFAULT_REFRESH_MINUTES));
+}
+
+function secondsToMinutes(seconds) {
+  return clampRefreshMinutes(Math.round((Number(seconds) || DEFAULT_REFRESH_MINUTES * 60) / 60));
+}
+
+function minutesToSeconds(minutes) {
+  return clampRefreshMinutes(minutes) * 60;
+}
+
+function formatRefreshMinutes(seconds) {
+  return `${secondsToMinutes(seconds)} min`;
+}
+
 export default function NodesManagerPage() {
   const { t } = useThemeLang();
 
@@ -14,12 +35,15 @@ export default function NodesManagerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [form, setForm] = useState({ model: "", refresh_rate: 30 });
+  const [form, setForm] = useState({ model: "", refresh_rate_minutes: DEFAULT_REFRESH_MINUTES });
   const [saving, setSaving] = useState(false);
   const [editingNodeId, setEditingNodeId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [renderForm, setRenderForm] = useState(false);
+  const [formPhase, setFormPhase] = useState("closed");
   const [nodeToDelete, setNodeToDelete] = useState(null);
   const [nodeToToggle, setNodeToToggle] = useState(null);
+  const formCloseTimerRef = useRef(null);
 
   function showSuccess(msg) {
     setSuccess(msg);
@@ -40,6 +64,44 @@ export default function NodesManagerPage() {
   }
 
   useEffect(() => { loadNodes(); }, []);
+
+  useEffect(() => {
+    if (formCloseTimerRef.current) {
+      window.clearTimeout(formCloseTimerRef.current);
+      formCloseTimerRef.current = null;
+    }
+
+    if (showForm) {
+      setRenderForm(true);
+      setFormPhase("entering");
+      const frameId = window.requestAnimationFrame(() => {
+        setFormPhase("open");
+      });
+
+      return () => window.cancelAnimationFrame(frameId);
+    }
+
+    if (renderForm) {
+      setFormPhase("closing");
+      formCloseTimerRef.current = window.setTimeout(() => {
+        setRenderForm(false);
+        setFormPhase("closed");
+        setEditingNodeId(null);
+        setForm({ model: "", refresh_rate_minutes: DEFAULT_REFRESH_MINUTES });
+        formCloseTimerRef.current = null;
+      }, FORM_EXIT_MS);
+    }
+
+    return undefined;
+  }, [showForm, renderForm]);
+
+  useEffect(() => {
+    return () => {
+      if (formCloseTimerRef.current) {
+        window.clearTimeout(formCloseTimerRef.current);
+      }
+    };
+  }, []);
 
   async function handleDeleteConfirm() {
     if (!nodeToDelete) return;
@@ -70,20 +132,21 @@ export default function NodesManagerPage() {
 
   function openNewForm() {
     setEditingNodeId(null);
-    setForm({ model: "", refresh_rate: 30 });
+    setForm({ model: "", refresh_rate_minutes: DEFAULT_REFRESH_MINUTES });
     setShowForm(true);
   }
 
   function openEditForm(node) {
     setEditingNodeId(node.node_id);
-    setForm({ model: node.model, refresh_rate: node.refresh_rate });
+    setForm({
+      model: node.model,
+      refresh_rate_minutes: secondsToMinutes(node.refresh_rate),
+    });
     setShowForm(true);
   }
 
   function closeForm() {
     setShowForm(false);
-    setEditingNodeId(null);
-    setForm({ model: "", refresh_rate: 30 });
   }
 
   async function handleSubmitNode(event) {
@@ -94,11 +157,15 @@ export default function NodesManagerPage() {
       if (editingNodeId) {
         await updateDeviceNode(editingNodeId, {
           model: form.model,
-          refresh_rate: Number(form.refresh_rate),
+          refresh_rate: minutesToSeconds(form.refresh_rate_minutes),
         });
         showSuccess(t("Nodo actualizado correctamente."));
       } else {
-        await createDeviceNode({ model: form.model, refresh_rate: Number(form.refresh_rate), status: "active" });
+        await createDeviceNode({
+          model: form.model,
+          refresh_rate: minutesToSeconds(form.refresh_rate_minutes),
+          status: "active",
+        });
         showSuccess(t("Nodo creado correctamente."));
       }
       closeForm();
@@ -166,7 +233,7 @@ export default function NodesManagerPage() {
                 <tr key={node.node_id}>
                   <td className="nm-col-id">N{node.node_id}</td>
                   <td className="nm-col-model">{node.model}</td>
-                  <td className="nm-col-refresh">{node.refresh_rate}s</td>
+                  <td className="nm-col-refresh">{formatRefreshMinutes(node.refresh_rate)}</td>
                   <td>
                     <span className={`nm-status-badge nm-status-badge--${node.status === "active" ? "active" : "off"}`}>
                       {node.status === "active" ? t("Active") : t("Offline")}
@@ -208,19 +275,36 @@ export default function NodesManagerPage() {
       </div>
 
       {/* ── Form modal ── */}
-      {showForm && (
-        <div className="modal-backdrop" onClick={closeForm}>
-          <div className="nm-modal nm-form-modal" onClick={(e) => e.stopPropagation()}>
+      {renderForm && (
+        <div
+          className={`modal-backdrop modal-backdrop--${formPhase}`}
+          onClick={closeForm}
+          aria-hidden={formPhase === "closing"}
+        >
+          <div
+            className={`nm-modal nm-form-modal nm-form-modal--${formPhase}`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="nm-form-modal__header">
-              <h3 className="nm-form__title">
-                {editingNodeId ? t("Edit Node Configuration") : t("Provision New Node")}
-              </h3>
+              <div className="nm-form-modal__intro">
+                <p className="nm-form-modal__eyebrow">
+                  {editingNodeId ? t("Node Control") : t("Node Provisioning")}
+                </p>
+                <h3 className="nm-form__title">
+                  {editingNodeId ? t("Edit Node Configuration") : t("Provision New Node")}
+                </h3>
+                <p className="nm-form-modal__subtitle">
+                  {editingNodeId
+                    ? t("Ajusta el modelo y el intervalo de transmision del nodo.")
+                    : t("Define el modelo y el intervalo operativo inicial del nodo.")}
+                </p>
+              </div>
               <button type="button" className="nm-modal-close" onClick={closeForm} aria-label="Cerrar">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            <form onSubmit={handleSubmitNode}>
+            <form className="nm-form" onSubmit={handleSubmitNode}>
               <div className="nm-form__grid">
                 <div className="nm-form__field">
                   <label className="nm-form__label" htmlFor="nm-model">{t("Node Model")}</label>
@@ -234,16 +318,39 @@ export default function NodesManagerPage() {
                     autoFocus
                   />
                 </div>
-                <div className="nm-form__field">
-                  <label className="nm-form__label" htmlFor="nm-refresh">{t("Refresh Rate (seconds)")}</label>
-                  <input
-                    id="nm-refresh"
-                    type="number"
-                    min="1"
-                    value={form.refresh_rate}
-                    onChange={(e) => setForm({ ...form, refresh_rate: e.target.value })}
-                    required
-                  />
+                <div className="nm-form__field nm-form__field--full">
+                  <div className="nm-form__field-head">
+                    <label className="nm-form__label" htmlFor="nm-refresh">
+                      {t("Refresh Rate (minutes)")}
+                    </label>
+                    <strong className="nm-form__slider-value">
+                      {form.refresh_rate_minutes} min
+                    </strong>
+                  </div>
+                  <div className="nm-form__slider-card">
+                    <input
+                      id="nm-refresh"
+                      className="nm-form__slider realtime-slider"
+                      type="range"
+                      min={MIN_REFRESH_MINUTES}
+                      max={MAX_REFRESH_MINUTES}
+                      step="1"
+                      value={form.refresh_rate_minutes}
+                      onChange={(e) =>
+                        setForm({ ...form, refresh_rate_minutes: clampRefreshMinutes(e.target.value) })
+                      }
+                      required
+                    />
+                    <div className="nm-form__slider-scale realtime-slider-scale" aria-hidden="true">
+                      <span>{MIN_REFRESH_MINUTES} min</span>
+                      <span>{MAX_REFRESH_MINUTES} min</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="nm-form__field nm-form__field--note">
+                  <p className="nm-form__helper">
+                    {t("El intervalo visible se configura en minutos y se envia al backend en segundos.")}
+                  </p>
                 </div>
               </div>
 

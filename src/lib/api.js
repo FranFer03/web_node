@@ -2,7 +2,9 @@ import { appSocket, API_BASE_URL } from "./appSocket";
 import { clearAuthState, getAuthState } from "./auth";
 
 function buildErrorMessage(status, data) {
-  if (import.meta.env.DEV) console.error("API error:", status, data);
+  if (import.meta.env.DEV && status !== 401 && status !== 403) {
+    console.error("API error:", status, data);
+  }
   if (status === 401 || status === 403) return "Acceso no autorizado.";
   if (status === 404) return "Recurso no encontrado.";
   if (status === 409) return data?.detail || "Conflicto con datos existentes.";
