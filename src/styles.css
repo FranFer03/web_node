@@ -6107,7 +6107,7 @@ tbody tr:hover {
 .dash-sensor-svg {
   flex: 1;
   min-width: 0;
-  height: auto;
+  height: 62px;
   display: block;
 }
 

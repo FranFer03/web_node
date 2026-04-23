@@ -421,7 +421,7 @@ export default function HistoricalDashboardPage() {
                   <span className="dash-sensor-name">{chart.label}</span>
                   <strong className="dash-sensor-val">{chart.latest !== null ? chart.latest.toFixed(2) : "—"}</strong>
                 </div>
-                <svg viewBox={`0 0 ${CW} ${CH}`} className="dash-sensor-svg" aria-label={chart.label}>
+                <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" className="dash-sensor-svg" aria-label={chart.label}>
                   <defs>
                     <linearGradient id={`${chart.chartId}-g`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={chart.color} stopOpacity="0.18" />
