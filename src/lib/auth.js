@@ -2,18 +2,31 @@ const ACCESS_TOKEN_KEY = "lora_access_token";
 const REFRESH_TOKEN_KEY = "lora_refresh_token";
 const USER_KEY = "lora_user";
 const EXPIRATION_KEY = "lora_access_expiry";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://almacenamiento-api-pf.s4bnsc.easypanel.host/";
 
 function dispatchAuthChanged() {
   window.dispatchEvent(new Event("auth-changed"));
 }
 
-function isSafeAvatarUrl(url) {
-  if (!url || typeof url !== "string") return false;
+function readStoredUser() {
+  const userRaw = localStorage.getItem(USER_KEY);
+  if (!userRaw) return null;
   try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:";
+    return JSON.parse(userRaw);
   } catch {
-    return false;
+    return null;
+  }
+}
+
+function normalizeAvatarUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  try {
+    const parsed = new URL(url, API_BASE_URL);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
   }
 }
 
@@ -32,7 +45,8 @@ function resolveAvatarUrl(source) {
     source.photoUrl,
   ];
   for (const url of candidates) {
-    if (isSafeAvatarUrl(url)) return url;
+    const normalized = normalizeAvatarUrl(url);
+    if (normalized) return normalized;
   }
   return null;
 }
@@ -64,11 +78,30 @@ export function getAuthState() {
 }
 
 function parseUser() {
-  const userRaw = localStorage.getItem(USER_KEY);
-  const parsedUser = userRaw ? JSON.parse(userRaw) : null;
-  return parsedUser
-    ? { ...parsedUser, avatarUrl: parsedUser.avatarUrl || resolveAvatarUrl(parsedUser) }
-    : null;
+  const parsedUser = readStoredUser();
+  if (!parsedUser) return null;
+
+  const avatarUrl =
+    resolveAvatarUrl({
+      foto: parsedUser.foto,
+      foto_url: parsedUser.foto_url,
+      fotoUrl: parsedUser.fotoUrl,
+      avatar: parsedUser.avatar,
+      avatar_url: parsedUser.avatar_url,
+      avatarUrl: parsedUser.avatarUrl,
+      image: parsedUser.image,
+      image_url: parsedUser.image_url,
+      imageUrl: parsedUser.imageUrl,
+      profile_photo: parsedUser.profile_photo,
+      profile_photo_url: parsedUser.profile_photo_url,
+      profilePhoto: parsedUser.profilePhoto,
+      profilePhotoUrl: parsedUser.profilePhotoUrl,
+      photo: parsedUser.photo,
+      photo_url: parsedUser.photo_url,
+      photoUrl: parsedUser.photoUrl,
+    }) || null;
+
+  return { ...parsedUser, avatarUrl };
 }
 
 export function setAuthState(loginData) {
@@ -82,6 +115,7 @@ export function setAuthState(loginData) {
     id: loginData?.user?.id || null,
     usuario: loginData?.user?.usuario || loginData?.usuario || "operator",
     rol: loginData?.user?.rol || loginData?.rol || "operator",
+    foto: loginData?.user?.foto || loginData?.foto || null,
     avatarUrl,
   };
 
@@ -90,6 +124,34 @@ export function setAuthState(loginData) {
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   localStorage.setItem(EXPIRATION_KEY, expiry.toString());
+  dispatchAuthChanged();
+}
+
+export function clearStoredAvatar() {
+  const user = readStoredUser();
+  if (!user) return;
+
+  const nextUser = {
+    ...user,
+    foto: null,
+    foto_url: null,
+    fotoUrl: null,
+    avatar: null,
+    avatar_url: null,
+    avatarUrl: null,
+    image: null,
+    image_url: null,
+    imageUrl: null,
+    profile_photo: null,
+    profile_photo_url: null,
+    profilePhoto: null,
+    profilePhotoUrl: null,
+    photo: null,
+    photo_url: null,
+    photoUrl: null,
+  };
+
+  localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
   dispatchAuthChanged();
 }
 

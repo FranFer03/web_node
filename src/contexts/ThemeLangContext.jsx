@@ -252,7 +252,12 @@ const translations = {
     "Error al cargar los logs": "Error loading logs",
     "Gestor de Nodos": "Node Manager",
     "Activos": "Active",
-    "Nuevo nodo": "New Node"
+    "Nuevo nodo": "New Node",
+    "Apply Filters": "Apply Filters",
+    "Viewing telemetry for": "Viewing telemetry for",
+    "exclusively": "exclusively",
+    "Coordenadas": "Coordinates",
+    "Análisis Estratégico": "Strategic Analysis"
   },
   es: {
     "Features": "Características",
@@ -447,7 +452,12 @@ const translations = {
     "Error al cargar los logs": "Error al cargar los logs",
     "Gestor de Nodos": "Gestor de Nodos",
     "Activos": "Activos",
-    "Nuevo nodo": "Nuevo nodo"
+    "Nuevo nodo": "Nuevo nodo",
+    "Apply Filters": "Aplicar Filtros",
+    "Viewing telemetry for": "Viendo telemetría de",
+    "exclusively": "exclusivamente",
+    "Coordenadas": "Coordenadas",
+    "Análisis Estratégico": "Análisis Estratégico"
   }
 };
 

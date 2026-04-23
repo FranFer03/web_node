@@ -16,6 +16,7 @@ const DETAIL_ZOOM = 15;
 const LABEL_VISIBLE_ZOOM = 13;
 const MIN_INTERVAL_MINUTES = 1;
 const MAX_INTERVAL_MINUTES = 60;
+const SIDEBAR_EXIT_MS = 220;
 
 function formatDateTime(value) {
   if (!value) return "-";
@@ -99,7 +100,13 @@ export default function NodesVisualizerPage() {
   const [intervalSaving, setIntervalSaving] = useState(false);
   const [intervalMinutes, setIntervalMinutes] = useState(MIN_INTERVAL_MINUTES);
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
+  const [renderedSidebarNode, setRenderedSidebarNode] = useState(null);
+  const [renderedSidebarLogs, setRenderedSidebarLogs] = useState([]);
+  const [renderedLogsError, setRenderedLogsError] = useState("");
+  const [renderedLogsLoading, setRenderedLogsLoading] = useState(false);
+  const [sidebarPhase, setSidebarPhase] = useState("closed");
   const intervalMinutesRef = useRef(MIN_INTERVAL_MINUTES);
+  const sidebarCloseTimerRef = useRef(null);
 
   const nodesById = useMemo(() => {
     const map = new Map();
@@ -118,6 +125,56 @@ export default function NodesVisualizerPage() {
   useEffect(() => {
     intervalMinutesRef.current = intervalMinutes;
   }, [intervalMinutes]);
+
+  useEffect(() => {
+    if (!selectedNode) return;
+    setRenderedSidebarNode(selectedNode);
+  }, [selectedNode]);
+
+  useEffect(() => {
+    if (!selectedNode) return;
+    setRenderedSidebarLogs(logs);
+    setRenderedLogsError(logsError);
+    setRenderedLogsLoading(logsLoading);
+  }, [selectedNode, logs, logsError, logsLoading]);
+
+  useEffect(() => {
+    if (sidebarCloseTimerRef.current) {
+      clearTimeout(sidebarCloseTimerRef.current);
+      sidebarCloseTimerRef.current = null;
+    }
+
+    if (selectedNode) {
+      setSidebarPhase("entering");
+      const frameId = window.requestAnimationFrame(() => {
+        setSidebarPhase("open");
+      });
+
+      return () => window.cancelAnimationFrame(frameId);
+    }
+
+    if (renderedSidebarNode) {
+      setSidebarPhase("closing");
+      sidebarCloseTimerRef.current = window.setTimeout(() => {
+        setRenderedSidebarNode(null);
+        setRenderedSidebarLogs([]);
+        setRenderedLogsError("");
+        setRenderedLogsLoading(false);
+        setSidebarPhase("closed");
+        sidebarCloseTimerRef.current = null;
+      }, SIDEBAR_EXIT_MS);
+    }
+
+    return undefined;
+  }, [selectedNode, renderedSidebarNode]);
+
+  useEffect(() => {
+    return () => {
+      if (sidebarCloseTimerRef.current) {
+        clearTimeout(sidebarCloseTimerRef.current);
+      }
+    };
+  }, []);
 
   const visibleNodes = useMemo(() => {
     return nodes.filter((node) => {
@@ -424,10 +481,12 @@ export default function NodesVisualizerPage() {
     );
   }
 
+  const sidebarNode = renderedSidebarNode;
+
   const statusLabel =
-    selectedNode?.status === "active"
+    sidebarNode?.status === "active"
       ? t("Active")
-      : selectedNode?.status === "maintenance"
+      : sidebarNode?.status === "maintenance"
       ? t("Mantenimiento")
       : t("Offline");
 
@@ -436,7 +495,7 @@ export default function NodesVisualizerPage() {
       {error && <div className="error-box">{error}</div>}
       {actionMessage && <div className="success-box">{actionMessage}</div>}
 
-      <div className={`realtime-layout ${selectedNode ? "realtime-layout--with-sidebar" : ""}`}>
+      <div className={`realtime-layout ${sidebarNode ? "realtime-layout--with-sidebar" : ""}`}>
         <section className="realtime-map-shell table-card app-data-card">
           <div ref={mapContainerRef} className="realtime-map-canvas" />
 
@@ -460,15 +519,18 @@ export default function NodesVisualizerPage() {
           )}
         </section>
 
-        {selectedNode && (
-          <aside className="realtime-sidebar table-card app-data-card">
+        {sidebarNode && (
+          <aside
+            className={`realtime-sidebar realtime-sidebar--${sidebarPhase} table-card app-data-card`}
+            aria-hidden={sidebarPhase === "closing"}
+          >
             <div className="realtime-sidebar-header">
               <div>
-                <small>{selectedNode.model}</small>
-                <h3>{`N${selectedNode.node_id}`}</h3>
+                <small>{sidebarNode.model}</small>
+                <h3>{`N${sidebarNode.node_id}`}</h3>
               </div>
               <div className="realtime-sidebar-header-actions">
-                <span className={`realtime-status-pill status-${selectedNode.status}`}>
+                <span className={`realtime-status-pill status-${sidebarNode.status}`}>
                   {statusLabel}
                 </span>
                 <button
@@ -487,29 +549,29 @@ export default function NodesVisualizerPage() {
               <div className="realtime-sidebar-section">
                 <div className="realtime-sidebar-section-head">
                   <span className="section-kicker section-kicker--sidebar">{t("Telemetria ambiental")}</span>
-                  <span>{formatDateTime(selectedNode.latest_timestamp)}</span>
+                  <span>{formatDateTime(sidebarNode.latest_timestamp)}</span>
                 </div>
 
                 <div className="realtime-metric-stack">
                   <article className="realtime-metric-card">
                     <small>{t("Temperatura")}</small>
                     <strong>
-                      {getMetricValue(selectedNode.metrics?.temperature)}
-                      <span>{selectedNode.metrics?.temperature?.unit || "°C"}</span>
+                      {getMetricValue(sidebarNode.metrics?.temperature)}
+                      <span>{sidebarNode.metrics?.temperature?.unit || "°C"}</span>
                     </strong>
                   </article>
                   <article className="realtime-metric-card">
                     <small>{t("Humedad")}</small>
                     <strong>
-                      {getMetricValue(selectedNode.metrics?.humidity)}
-                      <span>{selectedNode.metrics?.humidity?.unit || "%"}</span>
+                      {getMetricValue(sidebarNode.metrics?.humidity)}
+                      <span>{sidebarNode.metrics?.humidity?.unit || "%"}</span>
                     </strong>
                   </article>
                   <article className="realtime-metric-card">
                     <small>{t("Presion atmosferica")}</small>
                     <strong>
-                      {getMetricValue(selectedNode.metrics?.pressure)}
-                      <span>{selectedNode.metrics?.pressure?.unit || "hPa"}</span>
+                      {getMetricValue(sidebarNode.metrics?.pressure)}
+                      <span>{sidebarNode.metrics?.pressure?.unit || "hPa"}</span>
                     </strong>
                   </article>
                 </div>
@@ -521,15 +583,15 @@ export default function NodesVisualizerPage() {
                   <span>{LOG_LIMIT}</span>
                 </div>
 
-                {logsError ? (
-                  <div className="error-box">{logsError}</div>
-                ) : logsLoading ? (
+                {renderedLogsError ? (
+                  <div className="error-box">{renderedLogsError}</div>
+                ) : renderedLogsLoading ? (
                   <div className="realtime-inline-placeholder">{t("Cargando logs...")}</div>
-                ) : logs.length === 0 ? (
+                ) : renderedSidebarLogs.length === 0 ? (
                   <div className="realtime-inline-placeholder">{t("No hay logs recientes para este nodo.")}</div>
                 ) : (
                   <div className="realtime-log-list">
-                    {logs.map((log) => (
+                    {renderedSidebarLogs.map((log) => (
                       <div key={log.log_id} className="realtime-log-item">
                         <span>{formatLogTime(log.created_at || log.timestamp)}</span>
                         <strong>{log.level}</strong>
@@ -548,7 +610,7 @@ export default function NodesVisualizerPage() {
                   </div>
                   <button
                     type="button"
-                    className={`realtime-power-toggle ${selectedNode.status === "active" ? "is-on" : ""}`}
+                    className={`realtime-power-toggle ${sidebarNode.status === "active" ? "is-on" : ""}`}
                     onClick={handleTogglePower}
                     disabled={powerSaving}
                     aria-label={t("Cambiar energia del nodo")}

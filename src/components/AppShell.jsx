@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { getAuthState, resolveAvatarUrl } from "../lib/auth";
+import { clearStoredAvatar, getAuthState, resolveAvatarUrl } from "../lib/auth";
 import { useThemeLang } from "../contexts/ThemeLangContext";
 import { logoutUser } from "../lib/api";
 import { appSocket } from "../lib/appSocket";
@@ -45,6 +45,7 @@ export default function AppShell() {
   const { theme, toggleTheme, language, changeLanguage, t } = useThemeLang();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [logToasts, setLogToasts] = useState([]);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const userMenuRef = useRef(null);
   const toastTimersRef = useRef(new Map());
 
@@ -109,6 +110,10 @@ export default function AppShell() {
     };
   }, []);
 
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatarUrl]);
+
   async function handleLogout() {
     setUserMenuOpen(false);
     await logoutUser();
@@ -131,8 +136,16 @@ export default function AppShell() {
 
   const avatarEl = (
     <div className="user-avatar user-avatar--dock">
-      {avatarUrl ? (
-        <img src={avatarUrl} alt={`Avatar de ${user?.usuario || "operator"}`} className="user-avatar-image" />
+      {avatarUrl && !avatarLoadFailed ? (
+        <img
+          src={avatarUrl}
+          alt={`Avatar de ${user?.usuario || "operator"}`}
+          className="user-avatar-image"
+          onError={() => {
+            setAvatarLoadFailed(true);
+            clearStoredAvatar();
+          }}
+        />
       ) : (
         <span className="material-symbols-outlined user-avatar-generic" aria-hidden="true">
           account_circle
