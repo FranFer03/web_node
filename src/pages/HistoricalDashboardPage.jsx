@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getDeviceNodes, getMeasurementsFiltered, getSensorTypes } from "../lib/api";
 import { useThemeLang } from "../contexts/ThemeLangContext";
@@ -117,9 +117,9 @@ function buildTimeSeriesBySensor(rows, nodeId) {
 /* ── SVG chart helpers ── */
 const CW = 560, CH = 62, CP = 6;
 
-function computeXY(points, domains) {
+function computeXY(points, domains, cw = CW, ch = CH) {
   const { minX, maxX, minY, maxY } = domains;
-  const uw = CW - CP * 2, uh = CH - CP * 2;
+  const uw = cw - CP * 2, uh = ch - CP * 2;
   return points.map((p) => ({
     x: CP + (maxX === minX ? 0.5 : (p.timestamp - minX) / (maxX - minX)) * uw,
     y: CP + uh - (maxY === minY ? 0.5 : (p.value - minY) / (maxY - minY)) * uh,
@@ -136,9 +136,9 @@ function smoothPath(pts) {
   return d;
 }
 
-function smoothArea(pts) {
+function smoothArea(pts, ch = CH) {
   if (pts.length < 2) return "";
-  const baseline = CH - CP / 2;
+  const baseline = ch - CP / 2;
   return `${smoothPath(pts)} L${pts[pts.length - 1].x},${baseline} L${pts[0].x},${baseline} Z`;
 }
 
@@ -183,6 +183,21 @@ export default function HistoricalDashboardPage() {
   const [error, setError] = useState("");
   const [tablePage, setTablePage] = useState(1);
   const [lastKnownCoords, setLastKnownCoords] = useState(null);
+  const [svgWidth, setSvgWidth] = useState(CW);
+  const [panelHeight, setPanelHeight] = useState(0);
+  const chartsPanelRef = useRef(null);
+
+  useEffect(() => {
+    const el = chartsPanelRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setSvgWidth(Math.max(CW, Math.round(width - 90)));
+      setPanelHeight(Math.round(height));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   async function fetchMeasurements(activeFilters, activeNodeId) {
     if (!activeNodeId) return;
@@ -266,6 +281,20 @@ export default function HistoricalDashboardPage() {
 
   const temporalSeries = useMemo(() => buildTimeSeriesBySensor(measurements, selectedNodeId), [measurements, selectedNodeId]);
 
+  const chartCount = useMemo(() =>
+    temporalSeries.filter(({ sensorTypeId }) => {
+      const st = sensorTypeMap.get(sensorTypeId);
+      return !isLatitudeSensor(st, sensorTypeId) && !isLongitudeSensor(st, sensorTypeId);
+    }).length,
+    [temporalSeries, sensorTypeMap]
+  );
+
+  const svgHeight = useMemo(() => {
+    if (panelHeight === 0 || chartCount === 0) return CH;
+    const dividers = chartCount - 1;
+    return Math.max(CH, Math.floor((panelHeight - dividers) / chartCount));
+  }, [panelHeight, chartCount]);
+
   const perSensorCharts = useMemo(() =>
     temporalSeries
     .filter(({ sensorTypeId }) => {
@@ -278,7 +307,7 @@ export default function HistoricalDashboardPage() {
       const xs = series.points.map((p) => p.timestamp);
       const ys = series.points.map((p) => p.value);
       const domains = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
-      const xyPts = computeXY(series.points, domains);
+      const xyPts = computeXY(series.points, domains, svgWidth, svgHeight);
       const latest = series.points[series.points.length - 1]?.value ?? null;
       return {
         sensorTypeId: series.sensorTypeId, label, domains,
@@ -286,9 +315,11 @@ export default function HistoricalDashboardPage() {
         startLabel: formatEdgeLabel(domains.minX, domains.maxX), endLabel: formatEdgeLabel(domains.maxX, domains.minX),
         color: LINE_COLORS[idx % LINE_COLORS.length],
         chartId: `sc-${series.sensorTypeId}`,
+        cw: svgWidth, ch: svgHeight,
+        areaPath: smoothArea(xyPts, svgHeight),
       };
     }),
-    [temporalSeries, sensorTypeMap]
+    [temporalSeries, sensorTypeMap, svgWidth, svgHeight]
   );
 
   const stats = useMemo(() => {
@@ -394,9 +425,10 @@ export default function HistoricalDashboardPage() {
           <strong className="dash-stat__val">{stats.uniqueSensorTypes}</strong>
           <span className="dash-stat__sub">{t("Activos")}</span>
         </div>
-        <div className="dash-stat dash-stat--accent">
+        <div className="dash-stat">
           <span className="dash-stat__label">{t("Ultima medicion")}</span>
-          <strong className="dash-stat__val dash-stat__val--time">{formatTimeOnly(stats.latest)}</strong>
+          <strong className="dash-stat__val">{formatTimeOnly(stats.latest)}</strong>
+          <span className="dash-stat__sub">{t("última actualización")}</span>
         </div>
       </div>
 
@@ -404,7 +436,7 @@ export default function HistoricalDashboardPage() {
       <div className="dash-main-grid">
 
         {/* Charts panel */}
-        <div className="dash-charts-panel">
+        <div className="dash-charts-panel" ref={chartsPanelRef}>
           {loading && perSensorCharts.length === 0 ? (
             <div className="dash-charts-loading">
               <span className="material-symbols-outlined rotating">refresh</span>
@@ -421,33 +453,29 @@ export default function HistoricalDashboardPage() {
                   <span className="dash-sensor-name">{chart.label}</span>
                   <strong className="dash-sensor-val">{chart.latest !== null ? chart.latest.toFixed(2) : "—"}</strong>
                 </div>
-                <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" className="dash-sensor-svg" aria-label={chart.label}>
+                <svg viewBox={`0 0 ${chart.cw} ${chart.ch}`} className="dash-sensor-svg" aria-label={chart.label}>
                   <defs>
                     <linearGradient id={`${chart.chartId}-g`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={chart.color} stopOpacity="0.18" />
                       <stop offset="100%" stopColor={chart.color} stopOpacity="0" />
                     </linearGradient>
                     <clipPath id={`${chart.chartId}-clip`}>
-                      <rect x={CP} y={CP} width={CW - CP * 2} height={CH - CP * 2} />
+                      <rect x={CP} y={CP} width={chart.cw - CP * 2} height={chart.ch - CP * 2} />
                     </clipPath>
                   </defs>
-                  {/* grid lines */}
                   {[0.33, 0.66].map((f) => (
-                    <line key={f} x1={CP} y1={CP + (CH - CP * 2) * f} x2={CW - CP} y2={CP + (CH - CP * 2) * f}
+                    <line key={f} x1={CP} y1={CP + (chart.ch - CP * 2) * f} x2={chart.cw - CP} y2={CP + (chart.ch - CP * 2) * f}
                       stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
                   ))}
-                  {/* area + line clipped */}
                   <g clipPath={`url(#${chart.chartId}-clip)`}>
-                    <path d={smoothArea(chart.xyPts)} fill={`url(#${chart.chartId}-g)`} />
+                    <path d={chart.areaPath} fill={`url(#${chart.chartId}-g)`} />
                     <path d={smoothPath(chart.xyPts)} fill="none" stroke={chart.color} strokeWidth="1.2" strokeLinecap="round" />
                   </g>
-                  {/* dots */}
                   {chart.dots.map((pt, i) => (
                     <circle key={i} cx={pt.x} cy={pt.y} r={2} fill={chart.color} stroke="rgba(0,0,0,0.35)" strokeWidth="1" />
                   ))}
-                  {/* x-axis labels */}
-                  <text x={CP} y={CH - 1} className="dash-chart-lbl">{chart.startLabel}</text>
-                  <text x={CW / 2} y={CH - 1} textAnchor="middle" className="dash-chart-lbl">{chart.endLabel}</text>
+                  <text x={CP} y={chart.ch - 1} className="dash-chart-lbl">{chart.startLabel}</text>
+                  <text x={chart.cw / 2} y={chart.ch - 1} textAnchor="middle" className="dash-chart-lbl">{chart.endLabel}</text>
                 </svg>
                 {idx < perSensorCharts.length - 1 && <div className="dash-sensor-divider" />}
               </div>

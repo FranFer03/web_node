@@ -18,7 +18,7 @@ const MIN_INTERVAL_MINUTES = 1;
 const MAX_INTERVAL_MINUTES = 60;
 const SIDEBAR_EXIT_MS = 220;
 const SETTINGS_EXIT_MS = 220;
-const DEFAULT_COVERAGE_RADIUS_METERS = 1000;
+const DEFAULT_COVERAGE_RADIUS_METERS = 500;
 const MIN_COVERAGE_RADIUS_METERS = 100;
 const MAX_COVERAGE_RADIUS_METERS = 5000;
 const COVERAGE_RADIUS_STEP_METERS = 50;
@@ -319,6 +319,8 @@ export default function NodesVisualizerPage() {
         circleColor: "#ea580c",
         circleOpacity: 0.26,
         circleFillOpacity: 0.14,
+        linkColor: "#c2410c",
+        linkOpacity: 0.92,
       };
     }
 
@@ -326,6 +328,8 @@ export default function NodesVisualizerPage() {
       circleColor: "#ff7a1a",
       circleOpacity: 0.18,
       circleFillOpacity: 0.16,
+      linkColor: "#ff7a1a",
+      linkOpacity: 0.88,
     };
   }, [theme]);
 
@@ -551,6 +555,27 @@ export default function NodesVisualizerPage() {
 
     const bounds = [];
     const showPersistentLabels = mapZoom >= LABEL_VISIBLE_ZOOM;
+
+    for (let i = 0; i < visibleNodes.length; i++) {
+      for (let j = i + 1; j < visibleNodes.length; j++) {
+        const a = visibleNodes[i];
+        const b = visibleNodes[j];
+        if (a.status !== "active" || b.status !== "active") continue;
+        const dist = L.latLng(a.coordinates.lat, a.coordinates.lng)
+          .distanceTo(L.latLng(b.coordinates.lat, b.coordinates.lng));
+        if (dist <= coverageRadiusMeters * 2) {
+          L.polyline(
+            [[a.coordinates.lat, a.coordinates.lng], [b.coordinates.lat, b.coordinates.lng]],
+            {
+              color: mapAccent.linkColor,
+              opacity: mapAccent.linkOpacity,
+              weight: 4,
+              dashArray: "6 6",
+            }
+          ).addTo(overlaysRef.current);
+        }
+      }
+    }
 
     for (const node of visibleNodes) {
       const { lat, lng } = node.coordinates;

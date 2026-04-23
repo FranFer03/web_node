@@ -160,11 +160,13 @@ option {
   font: inherit;
 }
 
-select {
+select,
+input[type="date"] {
   color-scheme: dark;
 }
 
-[data-theme="light"] select {
+[data-theme="light"] select,
+[data-theme="light"] input[type="date"] {
   color-scheme: light;
 }
 
@@ -6020,11 +6022,6 @@ tbody tr:hover {
   gap: 0.25rem;
 }
 
-.dash-stat--accent {
-  border-color: rgba(249, 115, 22, 0.18);
-  background: rgba(249, 115, 22, 0.05);
-}
-
 .dash-stat__label {
   font-family: var(--mono);
   font-size: 0.53rem;
@@ -6043,7 +6040,6 @@ tbody tr:hover {
 }
 
 .dash-stat__val--time {
-  font-size: 1.1rem;
   letter-spacing: 0.04em;
 }
 
@@ -6069,9 +6065,13 @@ tbody tr:hover {
   border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(14, 18, 26, 0.9);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .dash-sensor-row {
+  flex: 1;
+  min-height: 62px;
   display: flex;
   align-items: stretch;
 }
@@ -6107,7 +6107,8 @@ tbody tr:hover {
 .dash-sensor-svg {
   flex: 1;
   min-width: 0;
-  height: 62px;
+  height: 100%;
+  min-height: 62px;
   display: block;
 }
 
